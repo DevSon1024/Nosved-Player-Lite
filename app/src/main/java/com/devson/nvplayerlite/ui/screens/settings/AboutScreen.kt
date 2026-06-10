@@ -290,7 +290,7 @@ fun AboutScreen(onBack: () -> Unit, onEnableDeveloperMode: () -> Unit) {
                             
                             Button(
                                 onClick = {
-                                    context.startActivity(Intent(Intent.ACTION_VIEW, "https://github.com/DevSon1024/Nosved-Player".toUri()))
+                                    context.startActivity(Intent(Intent.ACTION_VIEW, "https://github.com/DevSon1024/Nosved-Player-Lite".toUri()))
                                 },
                                 modifier = Modifier.weight(1f),
                                 contentPadding = PaddingValues(horizontal = 8.dp)
@@ -325,7 +325,7 @@ fun AboutScreen(onBack: () -> Unit, onEnableDeveloperMode: () -> Unit) {
                     description = stringResource(R.string.about_readme_desc),
                     icon = Icons.Filled.Description,
                     onClick = {
-                        context.startActivity(Intent(Intent.ACTION_VIEW, "https://github.com/DevSon1024/Nosved-Player".toUri()))
+                        context.startActivity(Intent(Intent.ACTION_VIEW, "https://github.com/DevSon1024/Nosved-Player-Lite".toUri()))
                     }
                 )
 
@@ -334,7 +334,7 @@ fun AboutScreen(onBack: () -> Unit, onEnableDeveloperMode: () -> Unit) {
                     description = stringResource(R.string.about_latest_release_desc),
                     icon = Icons.Filled.NewReleases,
                     onClick = {
-                        context.startActivity(Intent(Intent.ACTION_VIEW, "https://github.com/DevSon1024/Nosved-Player/releases".toUri()))
+                        context.startActivity(Intent(Intent.ACTION_VIEW, "https://github.com/DevSon1024/Nosved-Player-Lite/releases".toUri()))
                     }
                 )
 
@@ -343,7 +343,7 @@ fun AboutScreen(onBack: () -> Unit, onEnableDeveloperMode: () -> Unit) {
                     description = stringResource(R.string.about_github_issue_desc),
                     icon = Icons.Filled.BugReport,
                     onClick = {
-                        context.startActivity(Intent(Intent.ACTION_VIEW, "https://github.com/DevSon1024/Nosved-Player/issues".toUri()))
+                        context.startActivity(Intent(Intent.ACTION_VIEW, "https://github.com/DevSon1024/Nosved-Player-Lite/issues".toUri()))
                     }
                 )
 
