@@ -1,4 +1,4 @@
-# Tech Stack - nvplayer
+# Tech Stack - nvplayerlite
 
 Detailed breakdown of the technology stack and core dependencies.
 

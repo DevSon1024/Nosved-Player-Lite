@@ -1,4 +1,4 @@
-# Architecture - nvplayer
+# Architecture - nvplayerlite
 
 High-level architectural design and data flow of the application.
 

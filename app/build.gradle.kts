@@ -27,11 +27,11 @@ val splitApks = !project.hasProperty("noSplits") && !gradle.startParameter.taskN
 val appVersion = "1.4.0"
 
 android {
-    namespace = "com.devson.nvplayer"
+    namespace = "com.devson.nvplayerlite"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.devson.nvplayer"
+        applicationId = "com.devson.nvplayerlite"
         minSdk = 26
         targetSdk = 36
         versionCode = 140
@@ -168,9 +168,6 @@ dependencies {
     // nextlib
     implementation(libs.nextlib.media3ext)
     implementation(libs.nextlib.mediainfo)
-
-    // custom aar for replacing exoplayer
-    implementation(files("libs/universal.aar"))
 
     // FFMPEG kit for Video Utility
     implementation("io.github.jamaismagic.ffmpeg:ffmpeg-kit-main-full-gpl-16kb:6.1.4")

@@ -1,4 +1,4 @@
-# Project Structure - nvplayer
+# Project Structure - nvplayerlite
 
 A map of the codebase directory structure and file responsibilities.
 
@@ -11,7 +11,7 @@ A map of the codebase directory structure and file responsibilities.
 
 ## Module: /app
 
-### Source: /src/main/java/com/devson/nvplayer
+### Source: /src/main/java/com/devson/nvplayerlite
 
 - `/dao`: Room database Data Access Objects.
 - `/database`: Room database definition and migrations.

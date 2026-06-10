@@ -18,13 +18,13 @@
 
 **Nosved Player** is a clean, modern, and high-performance local video player for Android. Built from the ground up using **Jetpack Compose** and **Media3 (ExoPlayer)**, it delivers a premium media experience with a focus on simplicity, fluidity, and Material You design.
 
-> **⚠️ Migration Notice (v1.4.0+):** The application package name has migrated to `com.devson.nvplayer` to align with external app store releases. If you are updating from v1.3.0 or below, this will install as a fresh application.
+> **⚠️ Migration Notice (v1.4.0+):** The application package name has migrated to `com.devson.nvplayerlite` to align with external app store releases. If you are updating from v1.3.0 or below, this will install as a fresh application.
 
 ---
 
-## 📸 Screenshots
+> ## Screenshots
 
-### Home & Navigation
+>> ### Home & Navigation
 
 <div align="center">
 <img src="Screenshots/1-HomePage_With_HistoryCard.jpg" width="200" style="border-radius:16px; margin:6px;"/>
@@ -32,14 +32,14 @@
 <img src="Screenshots/3-VideoListView.jpg" width="200" style="border-radius:16px; margin:6px;"/>
 </div>
 
-### Sort, View Settings & Rotary Wheel
+>> ### Sort, View Settings & Rotary Wheel
 
 <div align="center">
 <img src="Screenshots/4-View_Settings.jpg" width="200" style="border-radius:16px; margin:6px;"/>
 <img src="Screenshots/5-RotterySortWheel.jpg" width="200" style="border-radius:16px; margin:6px;"/>
 </div>
 
-### Settings & About
+>> ### Settings & About
 
 <div align="center">
 <img src="Screenshots/6-SettingsScreen.jpg" width="200" style="border-radius:16px; margin:6px;"/>
@@ -47,7 +47,7 @@
 <img src="Screenshots/8-AboutScreen.jpg" width="200" style="border-radius:16px; margin:6px;"/>
 </div>
 
-### Player - Default & Modern Style (Landscape)
+>> ### Player - Default & Modern Style (Landscape)
 
 <div align="center">
 <img src="Screenshots/9-PlayerScreen-Default_Style.jpg" width="640" style="border-radius:16px; margin:6px; display:block;"/>
@@ -57,16 +57,16 @@
 
 ---
 
-## Key Features
+> ## Key Features
 
-### Playback & Dual Player UI
+>> ### Playback & Dual Player UI
 
 - **Default Style** - Clean, minimal controls with gesture-based brightness & volume adjustment.
 - **Modern Style** - Modern immersive controls with smooth multi-tap seek gestures, a swipe-up settings panel, Replay / Forward buttons, and an **Up Next** queue overlay.
 - **Advanced Playback Speed & Scrubbing** - Precision speed controls and visual live-scrubbing while interacting with the seekbar.
 - **HDR Fallback Mechanism** - Intelligently spoofs Dolby Vision MIME types to H.265 to prevent black screen issues on non-DV supported devices.
 
-### Advanced Gesture Controls
+>> ### Advanced Gesture Controls
 
 - **Right/Left Swipe** - Seek through video timeline forward and backward
 - **Right/Left Double Tap** - Seek 10s Forward and Backward (Seek time can be customised)
@@ -76,13 +76,13 @@
 - **2 Finger Single Tap** - Pause/Resume Video
 - **3 Finger Single Tap** - Lock 2x Speed
 
-### 💬 Powerful Subtitle Engine
+>> ### Powerful Subtitle Engine
 
 - **Embedded ASS/SSA Customization** - Full control over subtitle fonts, text size, bolding, and robust background corner boxes.
 - **Swipe-to-Seek Dialog** - Instantly jump backward or forward through dialogue lines by swiping directly on the subtitle text.
 - **Advanced Sync** - Manual speed sync and text encoding adjustments for perfect audio-visual timing.
 
-### 📁 Smart Library & UI Customization
+>> ### Smart Library & UI Customization
 
 - **Dynamic Home Screen** - Choose exactly what your dashboard displays: Storage Tracker, History Cards, or Latest Videos.
 - **Custom Landing Screen** - Bypass the Home page entirely and boot directly into your Video List.
@@ -90,19 +90,19 @@
 - **Rotary Sort Wheel** - A unique radial wheel picker for sorting videos with smooth spring-physics animations.
 - **Folder Views** - Multiple layout modes (All Folders, Files, Explorer, List, Grid).
 
-### Material You Dynamic Theme
+>> ### Material You Dynamic Theme
 
 - Full **Material 3** colour system with light and dark schemes.
 - Optional **Dynamic Colour** - adapts to your wallpaper on Android 12+ devices.
 - Status bar and navigation bar colours blend seamlessly with the app background.
 
-### 🛠️ Native Video Editing & Utilities
+>> ### Native Video Editing & Utilities
 
 - **Multi-Process Architecture** - Dual FFmpeg base libraries running simultaneously to support both robust decoding and native editing.
 - **Video-to-Audio Converter** - Extract audio from your media files directly within the app.
 - **Timestamp Tools** - Developer-friendly utilities for converting standard time to milliseconds and vice-versa.
 
-### ⚡ Performance & Compatibility
+>> ### Performance & Compatibility
 
 - Powered by **Google Media3 / ExoPlayer** with integrated **FFmpeg** decoders (via Nextlib) for broad format support.
 - Fast thumbnails using a custom **MediaStore-optimised Coil** integration.
@@ -111,7 +111,7 @@
 
 ---
 
-## Technical Stack
+> ## Technical Stack
 
 | Layer               | Technology                                                                                                                                           |
 | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -126,14 +126,14 @@
 
 ---
 
-## 🚀 Getting Started
+> ## Getting Started
 
-### Requirements
+>> ### Requirements
 
 - Android **API 26+** (Android 8.0 Oreo or higher)
 - [Android Studio Meerkat](https://developer.android.com/studio) or newer
 
-### Building from Source
+>> ### Building from Source
 
 ```bash
 git clone https://github.com/DevSon1024/Nosved-Player.git
@@ -145,7 +145,7 @@ git clone https://github.com/DevSon1024/Nosved-Player.git
 
 ---
 
-## ❤️ Support the Project
+> ## ❤️ Support the Project
 
 If you love using Nosved Player or find the source code helpful for your own projects, consider supporting its development!
 
@@ -153,13 +153,13 @@ If you love using Nosved Player or find the source code helpful for your own pro
 
 ---
 
-## 📄 License
+> ## 📄 License
 
 This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
 
 ---
 
-## Developed By
+> ## Developed By
 
 **Devendra Sonawane** (DevSon)
 
@@ -168,6 +168,6 @@ Made with ♥ and Kotlin.
 [![Telegram](https://img.shields.io/badge/Telegram-Nosved__Player-2CA5E0?logo=telegram)](https://t.me/Nosved_Player)
 [![GitHub](https://img.shields.io/badge/GitHub-DevSon1024-181717?logo=github)](https://github.com/DevSon1024)
 
-## Star History
+> ## Star History
 
 [![Star History Chart](https://api.star-history.com/chart?repos=Devson1024/nosved-player&type=date&legend=top-left)](https://www.star-history.com/?repos=Devson1024/nosved-player&type=date&legend=top-left)

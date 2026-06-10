@@ -1,4 +1,4 @@
-# Testing - nvplayer
+# Testing - nvplayerlite
 
 Documentation of the testing strategy, existing suites, and coverage.
 
@@ -12,14 +12,14 @@ Documentation of the testing strategy, existing suites, and coverage.
 
 ### Unit Tests (Local)
 
-- Location: `app/src/test/java/com/devson/nvplayer/`
+- Location: `app/src/test/java/com/devson/nvplayerlite/`
 - Current implementation:
   - `ExampleUnitTest.kt`: Boilerplate JUnit 4 test.
 - **Gaps**: No unit tests for `VideoRepository`, `PlayerManager`, or logic-heavy ViewModels.
 
 ### Instrumentation Tests (On-device)
 
-- Location: `app/src/androidTest/java/com/devson/nvplayer/`
+- Location: `app/src/androidTest/java/com/devson/nvplayerlite/`
 - Current implementation:
   - `ExampleInstrumentedTest.kt`: Boilerplate AndroidX test.
 - **Gaps**: No automated UI tests for critical flows like video playback, settings changes, or folder navigation.

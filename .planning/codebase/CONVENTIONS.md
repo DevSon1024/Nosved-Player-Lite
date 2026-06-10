@@ -1,4 +1,4 @@
-# Conventions - nvplayer
+# Conventions - nvplayerlite
 
 Coding standards, UI design patterns, and development best practices.
 

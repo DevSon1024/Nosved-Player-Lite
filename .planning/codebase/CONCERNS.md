@@ -1,4 +1,4 @@
-# Concerns - nvplayer
+# Concerns - nvplayerlite
 
 Identification of technical debt, architectural risks, and performance bottlenecks.
 

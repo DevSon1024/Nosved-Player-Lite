@@ -1,4 +1,4 @@
-# Integrations - nvplayer
+# Integrations - nvplayerlite
 
 Analysis of external services, system integrations, and permissions.
 
