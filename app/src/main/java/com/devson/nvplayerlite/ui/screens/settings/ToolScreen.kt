@@ -6,7 +6,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.VideoSettings
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -20,7 +19,6 @@ import androidx.compose.ui.unit.dp
 fun ToolScreen(
     onBack: () -> Unit,
     onNavigateToMilliSeconds: () -> Unit,
-    onNavigateToVideoEditor: () -> Unit,
     onNavigateToMediaStoreFinder: () -> Unit
 ) {
     Scaffold(
@@ -53,12 +51,6 @@ fun ToolScreen(
                 title = "Timestamp Tools",
                 description = "Convert epoch milliseconds to dates and vice versa with a live clock.",
                 onClick = onNavigateToMilliSeconds
-            )
-            ToolHubCard(
-                icon = Icons.Default.VideoSettings,
-                title = "Video -> Audio Converter (Work in Progress)",
-                description = "Extract audio from any video using hardware MediaCodec. (output may not be perfect as work is still in progress)",
-                onClick = onNavigateToVideoEditor
             )
             ToolHubCard(
                 icon = Icons.Default.Search,

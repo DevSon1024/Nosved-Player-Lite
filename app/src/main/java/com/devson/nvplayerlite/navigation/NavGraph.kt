@@ -27,7 +27,6 @@ import com.devson.nvplayerlite.ui.screens.SearchResultsScreen
 import com.devson.nvplayerlite.ui.screens.settings.SettingsScreen
 import com.devson.nvplayerlite.ui.screens.settings.ToolScreen
 import com.devson.nvplayerlite.ui.screens.settings.MilliSecondScreen
-import com.devson.nvplayerlite.ui.screens.settings.AudioConverterScreen
 import com.devson.nvplayerlite.ui.screens.settings.PlayerScreen
 import com.devson.nvplayerlite.ui.screens.videolist.VideoListScreen
 import com.devson.nvplayerlite.ui.screens.settings.AppearanceSettingsScreen
@@ -175,17 +174,12 @@ fun NavGraph(
             ToolScreen(
                 onBack = { safePopBackStack() },
                 onNavigateToMilliSeconds = { navController.navigate(Screen.MilliSecond.route) },
-                onNavigateToVideoEditor = { navController.navigate(Screen.VideoEditor.route) },
                 onNavigateToMediaStoreFinder = { navController.navigate(Screen.MediaStoreFinder.route) }
             )
         }
 
         composable(Screen.MilliSecond.route) {
             MilliSecondScreen(onBack = { safePopBackStack() })
-        }
-
-        composable(Screen.VideoEditor.route) {
-            AudioConverterScreen(onBack = { safePopBackStack() })
         }
 
         composable(Screen.PlayerInterface.route) {

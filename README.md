@@ -1,6 +1,6 @@
 <div align="center">
 
-# Nosved Player Lite Lite
+# Nosved Player Lite
 
 <img src="Screenshots/logo.png" width="160" height="160" style="border-radius: 80px;"/>
 
@@ -96,10 +96,10 @@
 - Optional **Dynamic Colour** - adapts to your wallpaper on Android 12+ devices.
 - Status bar and navigation bar colours blend seamlessly with the app background.
 
-> > ### Native Video Editing & Utilities
+> > ### Media Utilities
 
-- **Video-to-Audio Converter** - High-speed audio extraction from media files using Android's native `MediaExtractor` and `MediaMuxer` pipeline.
 - **Timestamp Tools** - Developer-friendly utilities for converting standard time to milliseconds and vice-versa.
+- **MediaStore ID Finder** - Quickly locate files and paths via Android MediaStore IDs.
 
 > > ### Performance & Compatibility
 

@@ -22,7 +22,6 @@ sealed class Screen(val route: String) {
     object ScanFolders : Screen("scan_folders")
     object Tool : Screen("tool_screen")
     object MilliSecond : Screen("milli_second")
-    object VideoEditor : Screen("video_editor")
     object PlayerInterface : Screen("player_interface")
     object CustomHome : Screen("custom_home")
     object Gestures : Screen("gestures")

@@ -183,7 +183,7 @@ fun SettingsScreen(
                 SettingsRow(
                     icon     = Icons.Default.Build,
                     title    = "Media Tools",
-                    subtitle = "Timestamp converter, video editor and more",
+                    subtitle = "Timestamp converter, MediaStore ID finder and more",
                     onClick  = onNavigateToTool
                 )
                 SettingsDivider()

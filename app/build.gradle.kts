@@ -177,9 +177,6 @@ dependencies {
     implementation(libs.androidx.media3.exoplayer.hls)
     implementation(libs.androidx.media3.exoplayer.dash)
     implementation(libs.androidx.media3.extractor)
-    // Transformer / Effect - retained for AudioConverter feature
-    implementation(libs.androidx.media3.transformer)
-    implementation(libs.androidx.media3.effect)
     // Inspector for non-playback media inspection / metadata extraction
     implementation(libs.androidx.media3.inspector)
     // Optional software-decoder extensions - uncomment to activate (increases APK size)
