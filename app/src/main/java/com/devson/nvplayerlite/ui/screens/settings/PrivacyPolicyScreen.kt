@@ -119,7 +119,7 @@ fun PrivacyPolicyScreen(onBack: () -> Unit) {
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "Nosved Player is a 100% offline, local video player. We collect absolutely no personal data - ever.",
+                            text = "Nosved Player Lite is a 100% offline, local video player. We collect absolutely no personal data - ever.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
                             textAlign = TextAlign.Center
@@ -142,7 +142,7 @@ fun PrivacyPolicyScreen(onBack: () -> Unit) {
                     PolicyPoint(
                         icon = Icons.Filled.Lock,
                         title = "No Data Collected",
-                        description = "Nosved Player does NOT collect, store, transmit, or share any personal information, usage data, analytics, or telemetry of any kind."
+                        description = "Nosved Player Lite does NOT collect, store, transmit, or share any personal information, usage data, analytics, or telemetry of any kind."
                     )
                     HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
                     PolicyPoint(
@@ -202,7 +202,7 @@ fun PrivacyPolicyScreen(onBack: () -> Unit) {
                         }
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
-                            text = "Nosved Player requests the \"Manage Files from Device\" (MANAGE_EXTERNAL_STORAGE) permission solely to enable the following file management operations:",
+                            text = "Nosved Player Lite requests the \"Manage Files from Device\" (MANAGE_EXTERNAL_STORAGE) permission solely to enable the following file management operations:",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.85f)
                         )
@@ -266,7 +266,7 @@ fun PrivacyPolicyScreen(onBack: () -> Unit) {
                     PolicyPoint(
                         icon = Icons.Filled.Security,
                         title = "No Tracking SDKs",
-                        description = "Nosved Player does not include any advertising, analytics, or crash-reporting SDKs (e.g., Firebase, Crashlytics, AdMob). Every library used is open-source and serves only a technical purpose in the UI or playback stack."
+                        description = "Nosved Player Lite does not include any advertising, analytics, or crash-reporting SDKs (e.g., Firebase, Crashlytics, AdMob). Every library used is open-source and serves only a technical purpose in the UI or playback stack."
                     )
                 }
 
@@ -279,7 +279,7 @@ fun PrivacyPolicyScreen(onBack: () -> Unit) {
                     PolicyPoint(
                         icon = Icons.Filled.Shield,
                         title = "Safe for All Ages",
-                        description = "Because we collect no data whatsoever, Nosved Player is safe for users of all ages. We do not knowingly collect information from children or anyone else."
+                        description = "Because we collect no data whatsoever, Nosved Player Lite is safe for users of all ages. We do not knowingly collect information from children or anyone else."
                     )
                 }
 
@@ -300,7 +300,7 @@ fun PrivacyPolicyScreen(onBack: () -> Unit) {
 
                 // Footer
                 Text(
-                    text = "Nosved Player - Built with privacy in mind by DevSon",
+                    text = "Nosved Player Lite - Built with privacy in mind by DevSon",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,

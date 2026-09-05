@@ -50,12 +50,6 @@
                 android:name="android.app.shortcuts"
                 android:resource="@xml/shortcuts" />
         </activity>
-
-        <service
-            android:name=".service.MediaConverterService"
-            android:process=":converter"
-            android:exported="false"
-            android:foregroundServiceType="mediaProcessing" />
     </application>
 
 </manifest>

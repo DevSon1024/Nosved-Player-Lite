@@ -28,6 +28,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
@@ -72,20 +73,39 @@ fun VideoScreen(
 
     val player by viewModel.playerInstance.collectAsState()
     val playingIntent by viewModel.playingIntent.collectAsState()
-    val currentPosition by viewModel.currentPosition?.collectAsState(initial = 0L)
+
+    // --- derivedStateOf: prevents whole-screen recomposition on rapid playback updates ---
+    // Only composables that READ these values recompose when they change, not VideoScreen
+    // as a whole. This is the primary fix for timeline-scrub jitter.
+    val rawCurrentPosition by viewModel.currentPosition?.collectAsState(initial = 0L)
         ?: remember { mutableStateOf(0L) }
-    val duration by viewModel.duration?.collectAsState(initial = 0L)
+    val currentPosition by remember { derivedStateOf { rawCurrentPosition } }
+
+    val rawDuration by viewModel.duration?.collectAsState(initial = 0L)
         ?: remember { mutableStateOf(0L) }
+    val duration by remember { derivedStateOf { rawDuration } }
+
+    val rawBufferedPosition by viewModel.bufferedPosition?.collectAsState(initial = 0L)
+        ?: remember { mutableStateOf(0L) }
+    @Suppress("unused")
+    val bufferedPosition by remember { derivedStateOf { rawBufferedPosition } }
+
+    val rawVideoFps by viewModel.videoFps?.collectAsState(initial = 0f)
+        ?: remember { mutableStateOf(0f) }
+    val videoFps by remember { derivedStateOf { rawVideoFps } }
+
+    val rawVideoDecoderName by viewModel.videoDecoderName?.collectAsState(initial = null)
+        ?: remember { mutableStateOf<String?>(null) }
+    val videoDecoderName by remember { derivedStateOf { rawVideoDecoderName } }
+    // -------------------------------------------------------------------------------
+
     val controlsVisible by viewModel.controlsVisible.collectAsState()
     val currentVideo by viewModel.currentVideo.collectAsState()
     val isPortrait by viewModel.isPortraitVideo?.collectAsState(initial = null)
         ?: remember { mutableStateOf<Boolean?>(null) }
 
     val showStats by viewModel.showStats.collectAsState()
-    val videoFps by viewModel.videoFps?.collectAsState(initial = 0f)
-        ?: remember { mutableStateOf(0f) }
-    val videoDecoderName by viewModel.videoDecoderName?.collectAsState(initial = null)
-        ?: remember { mutableStateOf<String?>(null) }
+
     val playerError by viewModel.playerError?.collectAsState(initial = null)
         ?: remember { mutableStateOf<String?>(null) }
 

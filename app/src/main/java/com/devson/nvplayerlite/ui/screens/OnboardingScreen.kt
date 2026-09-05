@@ -59,7 +59,7 @@ fun OnboardingScreen(
             accentColor = Color(0xFF0288D1),   // Blue-ish cyan - readable on both light & dark
             tag         = "ULTIMATE PLAYBACK",
             headline    = "Cinema-Grade\nCodec Support",
-            body        = "Nosved Player decodes HEVC H.265 10-bit\nHDR content natively. No transcoding, no\nquality loss. Pure, pixel-perfect playback."
+            body        = "Nosved Player Lite decodes HEVC H.265 10-bit\nHDR content natively. No transcoding, no\nquality loss. Pure, pixel-perfect playback."
         ),
         OnboardingSlide(
             icon        = Icons.Filled.Tune,

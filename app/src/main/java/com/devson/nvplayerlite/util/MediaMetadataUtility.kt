@@ -16,7 +16,7 @@ import kotlinx.coroutines.coroutineScope
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.exoplayer.MetadataRetriever
+import androidx.media3.inspector.MetadataRetriever
 import java.util.Locale
 import androidx.core.net.toUri
 
@@ -80,7 +80,9 @@ suspend fun getVideoMetadata(
         try {
             val mediaItem = MediaItem.fromUri(video.uri)
             // MetadataRetriever uses ExoPlayer's extractors, much better than system MediaExtractor
-            val trackGroups = MetadataRetriever.retrieveMetadata(context, mediaItem).get()
+            val trackGroups = MetadataRetriever.Builder(context, mediaItem).build().use { retriever ->
+                retriever.retrieveTrackGroups().get()
+            }
             
             for (i in 0 until trackGroups.length) {
                 val group = trackGroups.get(i)
@@ -133,7 +135,7 @@ suspend fun getVideoMetadata(
                         if (format.bitrate > 0) extra["Bitrate"] = "${format.bitrate / 1000} kbps"
                     }
                     TrackType.SUBTITLE -> {
-                        if (format.selectionFlags and C.SELECTION_FLAG_FORCED != 0) extra["Type"] = "Forced"
+                        if ((format.selectionFlags and C.SELECTION_FLAG_FORCED) != 0) extra["Type"] = "Forced"
                     }
                     else -> extra["MIME"] = mime
                 }

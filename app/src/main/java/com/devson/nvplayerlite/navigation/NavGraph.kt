@@ -15,6 +15,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.toRoute
 import com.devson.nvplayerlite.model.Video
 import com.devson.nvplayerlite.ui.screens.settings.AboutScreen
 import com.devson.nvplayerlite.ui.screens.HistoryScreen
@@ -31,8 +32,6 @@ import com.devson.nvplayerlite.ui.screens.settings.PlayerScreen
 import com.devson.nvplayerlite.ui.screens.videolist.VideoListScreen
 import com.devson.nvplayerlite.ui.screens.settings.AppearanceSettingsScreen
 import com.devson.nvplayerlite.ui.screens.settings.CustomHomeScreen
-import androidx.navigation.NavType
-import androidx.navigation.navArgument
 import com.devson.nvplayerlite.viewmodel.SettingsViewModel
 import com.devson.nvplayerlite.viewmodel.VideoListViewModel
 import com.devson.nvplayerlite.viewmodel.VideoViewModel
@@ -107,7 +106,8 @@ fun NavGraph(
                 onNavigateToSettings  = { navController.navigate(Screen.Settings.route) },
                 onNavigateToVideos    = { navController.navigate(Screen.Videos.route) },
                 onNavigateToHistory   = { navController.navigate(Screen.History.route) },
-                onNavigateToSearch    = { query -> navController.navigate(Screen.SearchResults.createRoute(query)) },
+                // Type-safe navigation: SearchResultsRoute eliminates manual URL encoding
+                onNavigateToSearch    = { query -> navController.navigate(SearchResultsRoute(query = query)) },
                 onNavigateToRecycleBin = { navController.navigate(Screen.RecycleBin.route) }
             )
         }
@@ -119,7 +119,8 @@ fun NavGraph(
                 onVideoSelected      = onVideoSelected,
                 onNavigateToSettings = { navController.navigate(Screen.Settings.route) },
                 onBack               = { safePopBackStack() },
-                onNavigateToSearch   = { query -> navController.navigate(Screen.SearchResults.createRoute(query)) },
+                // Type-safe navigation: SearchResultsRoute eliminates manual URL encoding
+                onNavigateToSearch   = { query -> navController.navigate(SearchResultsRoute(query = query)) },
                 viewModel            = videoListViewModel
             )
         }
@@ -239,14 +240,15 @@ fun NavGraph(
             )
         }
 
-        composable(
-            route = Screen.SearchResults.route,
-            arguments = listOf(navArgument("query") { type = NavType.StringType })
-        ) { backStackEntry ->
-            val raw = backStackEntry.arguments?.getString("query") ?: ""
-            val query = java.net.URLDecoder.decode(raw, "UTF-8")
+        // --- Type-safe SearchResults destination (Phase 3 migration demonstration) ---
+        // composable<SearchResultsRoute> replaces the old string-based registration:
+        //   composable(route = Screen.SearchResults.route, arguments = listOf(...))
+        // Arguments are decoded automatically via backStackEntry.toRoute<SearchResultsRoute>().
+        // No URLEncoder/URLDecoder calls needed.
+        composable<SearchResultsRoute> { backStackEntry ->
+            val args = backStackEntry.toRoute<SearchResultsRoute>()
             SearchResultsScreen(
-                query = query,
+                query = args.query,
                 onVideoSelected = onVideoSelected,
                 onBack = { safePopBackStack() }
             )

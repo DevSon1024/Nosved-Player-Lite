@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Nosved Player</string>
+    <string name="app_name">Nosved Player Lite</string>
 
     <!-- common -->
     <string name="unknown">Unknown</string>
@@ -24,7 +24,7 @@
     <string name="settings_Modern_controls_active">Inline settings panel active</string>
     <string name="settings_Modern_controls_inactive">Bottom sheet settings active</string>
     <string name="settings_app">App</string>
-    <string name="settings_about">About Nosved Player</string>
+    <string name="settings_about">About Nosved Player Lite</string>
     <string name="settings_about_desc">Version, credits &amp; open-source libraries</string>
     <string name="settings_privacy">Privacy Policy</string>
     <string name="settings_privacy_desc">How we handle permissions &amp; your data</string>

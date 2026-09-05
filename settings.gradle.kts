@@ -22,5 +22,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Nosved Player"
+rootProject.name = "Nosved Player Lite"
 include(":app")

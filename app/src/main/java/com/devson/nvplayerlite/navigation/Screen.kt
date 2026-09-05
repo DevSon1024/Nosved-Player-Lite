@@ -1,5 +1,9 @@
 package com.devson.nvplayerlite.navigation
 
+import kotlinx.serialization.Serializable
+
+// --- Existing string-route sealed class ---
+// All current destinations are preserved as-is. Do NOT remove or rename them.
 sealed class Screen(val route: String) {
     object Onboarding : Screen("onboarding")
     object Home       : Screen("home")
@@ -24,3 +28,20 @@ sealed class Screen(val route: String) {
     object Gestures : Screen("gestures")
     object MediaStoreFinder : Screen("media_store_finder")
 }
+
+// --- Type-safe route definitions (Kotlin Serialization) ---
+// Phase 3 demonstration: SearchResultsRoute uses @Serializable for compile-time
+// safety and automatic argument encoding - no manual URL encoding required.
+//
+// Usage in NavGraph:
+//   composable<SearchResultsRoute> { backStackEntry ->
+//       val args = backStackEntry.toRoute<SearchResultsRoute>()
+//       SearchResultsScreen(query = args.query, ...)
+//   }
+// Navigate via:
+//   navController.navigate(SearchResultsRoute(query = searchQuery))
+//
+// Future migration: define remaining destinations here and replace their
+// composable(Screen.X.route) registrations one screen at a time.
+@Serializable
+data class SearchResultsRoute(val query: String)

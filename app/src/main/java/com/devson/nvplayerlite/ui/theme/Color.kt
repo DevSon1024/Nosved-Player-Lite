@@ -2,7 +2,7 @@ package com.devson.nvplayerlite.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-//  NOSVED PLAYER - Shared colour tokens
+//  Nosved Player Lite - Shared colour tokens
 //  Full per-palette ColorSchemes live in AppThemePalette.kt.
 //  Constants here are used directly by Theme.kt default schemes and in the
 //  player UI (seek-bar tint, status badges, etc.).

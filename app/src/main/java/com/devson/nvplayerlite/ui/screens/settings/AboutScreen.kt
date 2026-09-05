@@ -146,11 +146,11 @@ private val libraries = listOf(
         license = "Apache License 2.0"
     ),
     LibraryInfo(
-        name = "FFmpegKit",
-        descriptionStr = "A library to run FFmpeg/FFprobe commands in applications.",
-        url = "https://github.com/jamaismagic/ffmpeg-kit",
-        version = "6.1.4",
-        license = "GPL-3.0 License"
+        name = "Nextlib",
+        descriptionStr = "Media3 ExoPlayer extensions with native FFmpeg decoders.",
+        url = "https://github.com/anilbeesetti/nextlib",
+        version = "0.8.8",
+        license = "Apache License 2.0"
     ),
     LibraryInfo(
         name = "DocumentFile",

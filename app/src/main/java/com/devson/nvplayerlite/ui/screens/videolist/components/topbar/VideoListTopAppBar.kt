@@ -118,7 +118,7 @@ fun VideoListTopAppBar(
                     )
                 } else {
                     Text(
-                        titleText ?: "Nosved Player",
+                        titleText ?: "Nosved Player Lite",
                         fontWeight = FontWeight.Bold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis

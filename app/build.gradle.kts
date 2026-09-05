@@ -6,6 +6,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
 }
 
@@ -64,7 +65,7 @@ android {
             isDebuggable = true
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
-            resValue("string", "app_name", "NosPlayer Beta")
+            resValue("string", "app_name", "NosLite Beta")
         }
 
         release {
@@ -74,7 +75,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            resValue("string", "app_name", "Nosved Player")
+            resValue("string", "app_name", "Nosved Player Lite Lite")
             if (keystorePropertiesFile.exists()) {
                 signingConfig = signingConfigs.getByName("release")
             }
@@ -86,8 +87,9 @@ android {
             abi {
                 isEnable = true
                 reset()
-                include("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
-                isUniversalApk = true
+                // x86 excluded: <1% of active devices; add back if sideload-on-emulator is required
+                include("arm64-v8a", "armeabi-v7a", "x86_64")
+                isUniversalApk = false
             }
         }
     }
@@ -96,7 +98,7 @@ android {
         variant.outputs.all {
             val outputImpl = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
             val abiName = outputImpl.filters.find { it.filterType == "ABI" }?.identifier ?: "universal"
-            outputFileName = "NosvedPlayer_v${variant.versionName}-${abiName}.apk"
+            outputFileName = "NosvedPlayerLite_v${variant.versionName}-${abiName}.apk"
         }
     }
     
@@ -125,6 +127,15 @@ android {
             excludes += "**/*.kotlin_metadata"
             excludes += "**/*.version"
             excludes += "**/kotlin-tooling-metadata.json"
+            // Additional metadata stripping (same set NextPlayer uses)
+            excludes += "DebugProbesKt.bin"
+            excludes += "**/attach_hotspot_windows.dll"
+            excludes += "META-INF/licenses/**"
+            excludes += "META-INF/*.properties"
+            excludes += "META-INF/gradle/**"
+            excludes += "META-INF/proguard/**"
+            excludes += "**.proto"
+            excludes += "**/DebugProbesKt.bin"
         }
         jniLibs {
             useLegacyPackaging = true
@@ -157,20 +168,30 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.iconsExtended)
 
-    // media3
+    // --- Media3 1.11.0 ---
     implementation(libs.androidx.media3.exoplayer)
+    implementation(libs.androidx.media3.ui)
+    // alpha: Material3-based Compose player controls surface
+    implementation(libs.androidx.media3.ui.compose)
     implementation(libs.androidx.media3.session)
+    implementation(libs.androidx.media3.exoplayer.hls)
+    implementation(libs.androidx.media3.exoplayer.dash)
+    implementation(libs.androidx.media3.extractor)
+    // Transformer / Effect - retained for AudioConverter feature
     implementation(libs.androidx.media3.transformer)
     implementation(libs.androidx.media3.effect)
+    // Inspector for non-playback media inspection / metadata extraction
+    implementation(libs.androidx.media3.inspector)
+    // Optional software-decoder extensions - uncomment to activate (increases APK size)
+    // implementation(libs.androidx.media3.decoder.av1)
+    // implementation(libs.androidx.media3.decoder.opus)
+    // implementation(libs.androidx.media3.decoder.vp9)
+    // implementation(libs.androidx.media3.decoder.flac)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
-    implementation(libs.androidx.media3.ui)
 
-    // nextlib
+    // Nextlib: Media3 ExoPlayer extensions with native decoders for broad format playback
     implementation(libs.nextlib.media3ext)
     implementation(libs.nextlib.mediainfo)
-
-    // FFMPEG kit for Video Utility
-    implementation("io.github.jamaismagic.ffmpeg:ffmpeg-kit-main-full-gpl-16kb:6.1.4")
     
     // DataStore for Settings
     implementation("androidx.datastore:datastore-preferences:1.0.0")
@@ -180,10 +201,14 @@ dependencies {
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)    
     
-    // Compose
-    implementation(libs.androidx.compose.material)
+    // Compose foundation + navigation (material3 already covers Material components)
+    // NOTE: libs.androidx.compose.material was androidx.wear.compose:compose-material (Wear OS).
+    // Removed — it does not belong in a phone app and added ~500 KB to every APK.
     implementation(libs.androidx.compose.foundation)
     implementation(libs.androidx.navigation.compose)
+
+    // Kotlinx Serialization (type-safe navigation routes)
+    implementation(libs.kotlinx.serialization.json)
 
     // coil
     implementation(libs.coil.compose)
