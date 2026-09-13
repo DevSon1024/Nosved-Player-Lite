@@ -16,7 +16,7 @@
 
 </div>
 
-**Nosved Player Lite** is a clean, modern, and high-performance local video player for Android. Built from the ground up using **Jetpack Compose** and **Media3 (ExoPlayer)**, it delivers a premium media experience with a focus on simplicity, fluidity, and Material You design.
+**Nosved Player Lite** is a clean, modern, and high performance local offline video player for Android. Built from the scratch using **Jetpack Compose** and **Media3 (ExoPlayer)**, it delivers a premium media experience with a focus on simplicity, fluidity, and Material You design.
 
 > **⚠️ Migration Notice (v1.4.0+):** The application package name has migrated to `com.devson.nvplayerlite` to align with external app store releases. If you are updating from v1.3.0 or below, this will install as a fresh application.
 
@@ -146,7 +146,7 @@ git clone https://github.com/DevSon1024/Nosved-Player-Lite.git
 
 > ## ❤️ Support the Project
 
-If you love using Nosved Player Lite or find the source code helpful for your own projects, consider supporting its development!
+If you like using Nosved Player Lite or find the app helpful for your own Likeness, consider supporting its development!
 
 **UPI Sponsorship available within the App Settings.**
 
