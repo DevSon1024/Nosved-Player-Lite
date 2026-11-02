@@ -14,7 +14,7 @@
 .cxx
 local.properties
 keystore.properties
-nosvedplayer-keystore
+NosvedPlayerLite-keystore.jks
 /*.txt
 *.log
 *.aar

@@ -11,6 +11,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import com.devson.nvplayerlite.model.ControlRegion
+import com.devson.nvplayerlite.model.PlayerButton
+import com.devson.nvplayerlite.model.AspectMode
 
 class SettingsViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -280,6 +283,90 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     fun updateLongPressSpeed(speed: Float) {
         viewModelScope.launch { settingsRepo.updateLongPressSpeed(speed) }
+    }
+
+    private fun parseControls(value: String): List<PlayerButton> {
+        if (value.isBlank()) return emptyList()
+        return value.split(',').mapNotNull { runCatching { PlayerButton.valueOf(it) }.getOrNull() }
+    }
+
+    val topLeftControls: StateFlow<List<PlayerButton>> = settingsRepo.playbackSettingsFlow
+        .map { parseControls(it.topLeftControls) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), parseControls("BACK_ARROW,VIDEO_TITLE"))
+
+    val topRightControls: StateFlow<List<PlayerButton>> = settingsRepo.playbackSettingsFlow
+        .map { parseControls(it.topRightControls) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), parseControls("DECODER,SUBTITLES,AUDIO_TRACK,MORE_OPTIONS"))
+
+    val bottomLeftControls: StateFlow<List<PlayerButton>> = settingsRepo.playbackSettingsFlow
+        .map { parseControls(it.bottomLeftControls) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), parseControls("LOCK_CONTROLS,PICTURE_IN_PICTURE"))
+
+    val bottomRightControls: StateFlow<List<PlayerButton>> = settingsRepo.playbackSettingsFlow
+        .map { parseControls(it.bottomRightControls) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), parseControls("ASPECT_RATIO,SCREEN_ROTATION"))
+
+    val portraitTopLeftControls: StateFlow<List<PlayerButton>> = settingsRepo.playbackSettingsFlow
+        .map { parseControls(it.portraitTopLeftControls) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), parseControls("BACK_ARROW,VIDEO_TITLE"))
+
+    val portraitTopRightControls: StateFlow<List<PlayerButton>> = settingsRepo.playbackSettingsFlow
+        .map { parseControls(it.portraitTopRightControls) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), parseControls("SUBTITLES,AUDIO_TRACK,MORE_OPTIONS"))
+
+    val portraitBottomControls: StateFlow<List<PlayerButton>> = settingsRepo.playbackSettingsFlow
+        .map { parseControls(it.portraitBottomControls) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), parseControls("DECODER,ASPECT_RATIO,SCREEN_ROTATION,LOCK_CONTROLS,PICTURE_IN_PICTURE"))
+
+    fun updateControls(region: ControlRegion, controls: List<PlayerButton>) {
+        val controlsStr = controls.joinToString(",")
+        viewModelScope.launch {
+            when (region) {
+                ControlRegion.TOP_LEFT -> settingsRepo.updateTopLeftControls(controlsStr)
+                ControlRegion.TOP_RIGHT -> settingsRepo.updateTopRightControls(controlsStr)
+                ControlRegion.BOTTOM_LEFT -> settingsRepo.updateBottomLeftControls(controlsStr)
+                ControlRegion.BOTTOM_RIGHT -> settingsRepo.updateBottomRightControls(controlsStr)
+                ControlRegion.PORTRAIT_TOP_LEFT -> settingsRepo.updatePortraitTopLeftControls(controlsStr)
+                ControlRegion.PORTRAIT_TOP_RIGHT -> settingsRepo.updatePortraitTopRightControls(controlsStr)
+                ControlRegion.PORTRAIT_BOTTOM -> settingsRepo.updatePortraitBottomControls(controlsStr)
+            }
+        }
+    }
+
+    fun updateIsBottomLayoutEnabled(enabled: Boolean) {
+        viewModelScope.launch { settingsRepo.updateIsBottomLayoutEnabled(enabled) }
+    }
+
+    fun updateShowControlGradients(enabled: Boolean) {
+        viewModelScope.launch { settingsRepo.updateShowControlGradients(enabled) }
+    }
+
+    fun updateShowNextPrevButtons(enabled: Boolean) {
+        viewModelScope.launch { settingsRepo.updateShowNextPrevButtons(enabled) }
+    }
+
+    fun updateAspectMode(mode: AspectMode) {
+        viewModelScope.launch { settingsRepo.updateAspectMode(mode) }
+    }
+
+    fun updateControlIconSize(size: String) {
+        viewModelScope.launch { settingsRepo.updateControlIconSize(size) }
+    }
+
+    fun updateSeekBarStyle(style: String) {
+        viewModelScope.launch { settingsRepo.updateSeekBarStyle(style) }
+    }
+
+    fun updateAutoPlayEnabled(enabled: Boolean) {
+        viewModelScope.launch { settingsRepo.updateAutoPlayEnabled(enabled) }
+    }
+
+    fun updateShowSeekButtons(enabled: Boolean) {
+        viewModelScope.launch { settingsRepo.updateShowSeekButtons(enabled) }
+    }
+
+    fun updateBackgroundPlayEnabled(enabled: Boolean) {
+        viewModelScope.launch { settingsRepo.updateBackgroundPlayEnabled(enabled) }
     }
 
     fun updateDoubleTapAction(action: com.devson.nvplayerlite.repository.DoubleTapAction) {

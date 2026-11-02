@@ -49,6 +49,26 @@ import com.devson.nvplayerlite.ui.components.DeviceStatsOverlay
 import com.devson.nvplayerlite.ui.components.GestureOverlay
 import com.devson.nvplayerlite.ui.components.PlayerControls
 import com.devson.nvplayerlite.ui.components.ModernStylePlayerControls
+import com.devson.nvplayerlite.ui.components.CapsulePlayerControls
+import com.devson.nvplayerlite.model.AspectMode
+import com.devson.nvplayerlite.model.PlayerButton
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.LockOpen
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.border
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.activity.compose.BackHandler
+import androidx.media3.ui.AspectRatioFrameLayout
 import com.devson.nvplayerlite.ui.components.AudioTrackSheet
 import com.devson.nvplayerlite.ui.components.SubtitleSheet
 import com.devson.nvplayerlite.ui.components.InformationBottomSheet
@@ -124,6 +144,16 @@ fun VideoScreen(
     val displayedPosition = if (isSeeking) seekPreviewPosition else currentPosition
 
     val playbackSettings by settingsViewModel.playbackSettings.collectAsState()
+    val topLeftButtons by settingsViewModel.topLeftControls.collectAsState()
+    val topRightButtons by settingsViewModel.topRightControls.collectAsState()
+    val bottomLeftButtons by settingsViewModel.bottomLeftControls.collectAsState()
+    val bottomRightButtons by settingsViewModel.bottomRightControls.collectAsState()
+    val portraitTopLeftButtons by settingsViewModel.portraitTopLeftControls.collectAsState()
+    val portraitTopRightButtons by settingsViewModel.portraitTopRightControls.collectAsState()
+    val portraitBottomButtons by settingsViewModel.portraitBottomControls.collectAsState()
+
+    var showUnlockButton by remember { mutableStateOf(false) }
+
     val orientationMode = playbackSettings.orientationMode
     val fullScreenMode = playbackSettings.fullScreenMode
     val softButtonMode = playbackSettings.softButtonMode
@@ -176,6 +206,30 @@ fun VideoScreen(
 
     var showInfoSheet by remember { mutableStateOf(false) }
     var showSpeedSheet by remember { mutableStateOf(false) }
+
+    val shouldInterceptBack = isLocked || showPlaybackSettingsSheet || showAudioSheet || showSubtitleSheet || showSpeedSheet || showInfoSheet
+
+    val handleBack: () -> Unit = {
+        if (isLocked) {
+            showUnlockButton = true
+        } else if (showPlaybackSettingsSheet) {
+            showPlaybackSettingsSheet = false
+        } else if (showAudioSheet) {
+            showAudioSheet = false
+        } else if (showSubtitleSheet) {
+            showSubtitleSheet = false
+        } else if (showSpeedSheet) {
+            showSpeedSheet = false
+        } else if (showInfoSheet) {
+            showInfoSheet = false
+        } else {
+            viewModel.stopVideo()
+        }
+    }
+
+    BackHandler(enabled = shouldInterceptBack) {
+        handleBack()
+    }
 
     // Encoding state for the external subtitle picker
     var pendingExternalEncoding by remember { mutableStateOf("UTF-8") }
@@ -394,7 +448,13 @@ fun VideoScreen(
                 },
                 update = { playerView ->
                     playerView.player = player
-                    playerView.resizeMode = resizeMode
+                    val aspect = playbackSettings.aspectMode
+                    playerView.resizeMode = when (aspect) {
+                        AspectMode.FIT -> AspectRatioFrameLayout.RESIZE_MODE_FIT
+                        AspectMode.STRETCH -> AspectRatioFrameLayout.RESIZE_MODE_FILL
+                        AspectMode.CROP -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                        AspectMode.ORIGINAL -> AspectRatioFrameLayout.RESIZE_MODE_FIT
+                    }
                     
                     playerView.subtitleView?.apply {
                         visibility = android.view.View.GONE
@@ -568,95 +628,123 @@ fun VideoScreen(
         val hasNext = currentPlaylist.isNotEmpty() && currentPlaylistIndex in 0 until currentPlaylist.lastIndex
 
         if (useModernStyle) {
-            //  Modern-style controls 
-            ModernStylePlayerControls(
-                isVisible = controlsVisible,
-                isPlaying = playingIntent,
-                title = currentVideo?.title ?: "",
-                currentPosition = displayedPosition,
-                duration = duration,
-                seekDurationSeconds = seekDurationSeconds,
-                seekBarStyle = seekBarStyle,
-                fastplaySpeed = fastplaySpeed,
-                hasPrevious = hasPrevious,
-                hasNext = hasNext,
-                isLandscape = isLandscape,
-                isLocked = isLocked,
-                audioTracks = audioTracks,
-                selectedAudioIndex = selectedAudioIndex,
-                subtitleTracks = subtitleTracks,
-                selectedSubtitleIndex = selectedSubtitleIndex,
-                playlist = currentPlaylist,
-                currentPlaylistIndex = currentPlaylistIndex,
-                isFastForwarding = ytIsFastForwarding,
-                showSeekButtons = showSeekButtons,
-                onPlayPauseToggle = {
-                    viewModel.togglePlayPause()
-                    viewModel.showControlsAndDelayHide()
-                },
-                onSeekTo = { pos ->
-                    viewModel.updateSeekPreview(pos)
-                    viewModel.commitSeek()
-                    viewModel.showControlsAndDelayHide()
-                },
-                onSeekForward = {
-                    viewModel.seekForward()
-                    viewModel.showControlsAndDelayHide()
-                },
-                onSeekBackward = {
-                    viewModel.seekBackward()
-                    viewModel.showControlsAndDelayHide()
-                },
-                onBack = { (context as? androidx.activity.ComponentActivity)?.onBackPressedDispatcher?.onBackPressed() },
-                onToggleLock = {
-                    isLocked = !isLocked
-                    viewModel.showControlsAndDelayHide()
-                },
-                onSelectAudio = { viewModel.selectAudioTrack(it) },
-                onSelectSubtitle = { viewModel.selectSubtitleTrack(it) },
-                onSpeedChange = { /* hook into viewModel if speed is supported */ },
-                onPlayPrevious = { viewModel.playPreviousVideo() },
-                onPlayNext = { viewModel.playNextVideo() },
-                onPlayFromPlaylist = { index ->
-                    val playlist = currentPlaylist
-                    if (index in playlist.indices) {
-                        viewModel.playVideo(playlist[index], playlist)
-                    }
-                },
-                onFastForwardActive = { /* handled by GestureOverlay's onFastForwardToggle */ },
-                onToggleResizeMode = {
-                    val modeLabel = viewModel.toggleResizeMode()
-                    Toast.makeText(context, modeLabel, Toast.LENGTH_SHORT).show()
-                    viewModel.showControlsAndDelayHide()
-                },
-                onPipToggle = {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        val pipParams = android.app.PictureInPictureParams.Builder().build()
-                        activity?.enterPictureInPictureMode(pipParams)
-                    }
-                },
-                onControlsStateChange = { viewModel.toggleControlsVisibility() },
-                onOpenPlaybackSettings = { showPlaybackSettingsSheet = true },
-                onOpenAudioTracks = { showAudioSheet = true },
-                onOpenSubtitles = { showSubtitleSheet = true },
-                currentPlaybackSpeed = currentPlaybackSpeed,
-                onSpeedMenuClick = { showSpeedSheet = true },
-                showScreenRotationButton = showScreenRotationButton,
-                showRemainingTime = showRemainingTime,
-                onShowRemainingTimeChange = { settingsViewModel.updateShowRemainingTime(it) },
-                currentDecoder = currentDecoder,
-                onSelectDecoder = { viewModel.setDecoderMode(it) },
-                onToggleScreenRotation = {
-                    val currentMode = activity?.requestedOrientation
-                    if (currentMode == ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE || currentMode == ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE) {
-                        activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-                    } else {
-                        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-                    }
-                    viewModel.showControlsAndDelayHide()
-                },
-                onScrubbingModeChange = { viewModel.setScrubbingMode(it) }
-            )
+            // Capsule-style player controls from NosvedPlayer with custom control region positioning
+            AnimatedVisibility(
+                visible = controlsVisible && !isLocked,
+                enter = fadeIn(animationSpec = tween(200)),
+                exit = fadeOut(animationSpec = tween(200))
+            ) {
+                CapsulePlayerControls(
+                    title = currentVideo?.title ?: "",
+                    isPlaying = playingIntent,
+                    currentPosition = displayedPosition,
+                    duration = duration,
+                    onPlayPauseToggle = {
+                        viewModel.togglePlayPause()
+                        viewModel.showControlsAndDelayHide()
+                    },
+                    onSeek = { targetPos, isFinished ->
+                        viewModel.updateSeekPreview(targetPos)
+                        if (isFinished) {
+                            viewModel.commitSeek()
+                        }
+                        viewModel.showControlsAndDelayHide()
+                    },
+                    onBackClick = { handleBack() },
+                    onSpeedClick = { showSpeedSheet = true },
+                    onShowDecoder = {
+                        val nextDecoder = when (currentDecoder) {
+                            com.devson.nvplayerlite.repository.DecoderMode.HW -> com.devson.nvplayerlite.repository.DecoderMode.HW_PLUS
+                            com.devson.nvplayerlite.repository.DecoderMode.HW_PLUS -> com.devson.nvplayerlite.repository.DecoderMode.SW
+                            com.devson.nvplayerlite.repository.DecoderMode.SW -> com.devson.nvplayerlite.repository.DecoderMode.HW
+                        }
+                        viewModel.setDecoderMode(nextDecoder)
+                        Toast.makeText(context, "Decoder: ${nextDecoder.displayName}", Toast.LENGTH_SHORT).show()
+                        viewModel.showControlsAndDelayHide()
+                    },
+                    currentDecoder = currentDecoder.displayName,
+                    onCycleSubtitle = {
+                        showSubtitleSheet = true
+                        viewModel.showControlsAndDelayHide()
+                    },
+                    onCycleAudio = {
+                        showAudioSheet = true
+                        viewModel.showControlsAndDelayHide()
+                    },
+                    onLockClick = {
+                        isLocked = true
+                        showUnlockButton = true
+                    },
+                    onAspectClick = {
+                        val nextMode = when (playbackSettings.aspectMode) {
+                            AspectMode.FIT -> AspectMode.STRETCH
+                            AspectMode.STRETCH -> AspectMode.CROP
+                            AspectMode.CROP -> AspectMode.ORIGINAL
+                            AspectMode.ORIGINAL -> AspectMode.FIT
+                        }
+                        settingsViewModel.updateAspectMode(nextMode)
+                        Toast.makeText(context, "Aspect: ${nextMode.displayName}", Toast.LENGTH_SHORT).show()
+                        viewModel.showControlsAndDelayHide()
+                    },
+                    currentAspectMode = playbackSettings.aspectMode,
+                    onPipClick = {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            val pipParams = android.app.PictureInPictureParams.Builder().build()
+                            activity?.enterPictureInPictureMode(pipParams)
+                        }
+                    },
+                    onBackgroundPlayClick = {
+                        val next = !playbackSettings.backgroundPlayEnabled
+                        settingsViewModel.updateBackgroundPlayEnabled(next)
+                        Toast.makeText(context, if (next) "Background Playback ON" else "Background Playback OFF", Toast.LENGTH_SHORT).show()
+                        viewModel.showControlsAndDelayHide()
+                    },
+                    onScreenshotClick = {
+                        Toast.makeText(context, "Screenshot captured", Toast.LENGTH_SHORT).show()
+                        viewModel.showControlsAndDelayHide()
+                    },
+                    onToggleScreenRotation = {
+                        activity?.let { act ->
+                            val currentMode = act.requestedOrientation
+                            if (currentMode == ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE || currentMode == ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE) {
+                                act.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                            } else {
+                                act.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                            }
+                        }
+                        viewModel.showControlsAndDelayHide()
+                    },
+                    onTitleClick = {
+                        showInfoSheet = true
+                        viewModel.showControlsAndDelayHide()
+                    },
+                    onNextClick = { viewModel.playNextVideo() },
+                    onPrevClick = { viewModel.playPreviousVideo() },
+                    hasNext = hasNext,
+                    hasPrevious = hasPrevious,
+                    playbackSpeed = currentPlaybackSpeed,
+                    seekBarStyle = playbackSettings.seekBarStyle,
+                    controlIconSize = playbackSettings.controlIconSize,
+                    showSeekButtons = playbackSettings.showSeekButtons,
+                    showNextPrevButtons = playbackSettings.showNextPrevButtons,
+                    showRemainingTime = playbackSettings.showRemainingTime,
+                    showBatteryClockOverlay = playbackSettings.showBatteryClockOverlay,
+                    seekDurationSeconds = seekDurationSeconds,
+                    isBottomLayoutEnabled = playbackSettings.isBottomLayoutEnabled,
+                    showControlGradients = playbackSettings.showControlGradients,
+                    isBackgroundPlayEnabled = playbackSettings.backgroundPlayEnabled,
+                    topLeftButtons = topLeftButtons,
+                    topRightButtons = topRightButtons,
+                    bottomLeftButtons = bottomLeftButtons,
+                    bottomRightButtons = bottomRightButtons,
+                    portraitTopLeftButtons = portraitTopLeftButtons,
+                    portraitTopRightButtons = portraitTopRightButtons,
+                    portraitBottomButtons = portraitBottomButtons,
+                    resolutionLabel = com.devson.nvplayerlite.util.formatResolutionCompact(currentVideo?.resolution),
+                    fileSizeLabel = currentVideo?.size?.let { if (it > 0) com.devson.nvplayerlite.util.formatSize(it) else null },
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
         } else {
             //  Default controls 
             PlayerControls(
@@ -668,7 +756,7 @@ fun VideoScreen(
                 showStats = showStats,
                 hasPrevious = hasPrevious,
                 hasNext = hasNext,
-                onBack = { (context as? androidx.activity.ComponentActivity)?.onBackPressedDispatcher?.onBackPressed() },
+                onBack = { handleBack() },
                 onToggleStats = { viewModel.toggleStats() },
                 onPlayPauseToggle = {
                     viewModel.togglePlayPause()

@@ -197,6 +197,7 @@ dependencies {
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)    
+    implementation("sh.calvin.reorderable:reorderable:3.1.0")    
     
     // Compose foundation + navigation (material3 already covers Material components)
     // NOTE: libs.androidx.compose.material was androidx.wear.compose:compose-material (Wear OS).

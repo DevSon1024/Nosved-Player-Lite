@@ -185,6 +185,14 @@ fun NavGraph(
         composable(Screen.PlayerInterface.route) {
             PlayerScreen(
                 onBack = { safePopBackStack() },
+                onNavigateToControlEditor = { navController.navigate(Screen.ControlEditor.route) },
+                settingsViewModel = settingsViewModel
+            )
+        }
+
+        composable(Screen.ControlEditor.route) {
+            com.devson.nvplayerlite.ui.screens.settings.ControlLayoutEditorScreen(
+                onNavigateBack = { safePopBackStack() },
                 settingsViewModel = settingsViewModel
             )
         }

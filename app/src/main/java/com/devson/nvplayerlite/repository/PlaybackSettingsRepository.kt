@@ -11,6 +11,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import com.devson.nvplayerlite.model.AspectMode
 
 val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "playback_settings")
 
@@ -65,7 +66,19 @@ data class PlaybackSettings(
     val threeFingerAction: MultiFingerAction = MultiFingerAction.FAST_PLAY,
     val longPressEnabled: Boolean = true,
     val longPressSpeed: Float = 2.0f,
-    val doubleTapAction: DoubleTapAction = DoubleTapAction.BOTH
+    val doubleTapAction: DoubleTapAction = DoubleTapAction.BOTH,
+    val topLeftControls: String = "BACK_ARROW,VIDEO_TITLE",
+    val topRightControls: String = "DECODER,SUBTITLES,AUDIO_TRACK,MORE_OPTIONS",
+    val bottomLeftControls: String = "LOCK_CONTROLS,PICTURE_IN_PICTURE",
+    val bottomRightControls: String = "ASPECT_RATIO,SCREEN_ROTATION",
+    val portraitTopLeftControls: String = "BACK_ARROW,VIDEO_TITLE",
+    val portraitTopRightControls: String = "SUBTITLES,AUDIO_TRACK,MORE_OPTIONS",
+    val portraitBottomControls: String = "DECODER,ASPECT_RATIO,SCREEN_ROTATION,LOCK_CONTROLS,PICTURE_IN_PICTURE",
+    val isBottomLayoutEnabled: Boolean = false,
+    val showControlGradients: Boolean = true,
+    val showNextPrevButtons: Boolean = true,
+    val aspectMode: AspectMode = AspectMode.FIT,
+    val backgroundPlayEnabled: Boolean = false
 )
 
 class PlaybackSettingsRepository(private val context: Context) {
@@ -116,6 +129,18 @@ class PlaybackSettingsRepository(private val context: Context) {
         val LONG_PRESS_ENABLED = booleanPreferencesKey("long_press_enabled")
         val LONG_PRESS_SPEED = floatPreferencesKey("long_press_speed")
         val DOUBLE_TAP_ACTION = stringPreferencesKey("double_tap_action")
+        val TOP_LEFT_CONTROLS = stringPreferencesKey("top_left_controls")
+        val TOP_RIGHT_CONTROLS = stringPreferencesKey("top_right_controls")
+        val BOTTOM_LEFT_CONTROLS = stringPreferencesKey("bottom_left_controls")
+        val BOTTOM_RIGHT_CONTROLS = stringPreferencesKey("bottom_right_controls")
+        val PORTRAIT_TOP_LEFT_CONTROLS = stringPreferencesKey("portrait_top_left_controls")
+        val PORTRAIT_TOP_RIGHT_CONTROLS = stringPreferencesKey("portrait_top_right_controls")
+        val PORTRAIT_BOTTOM_CONTROLS = stringPreferencesKey("portrait_bottom_controls")
+        val IS_BOTTOM_LAYOUT_ENABLED = booleanPreferencesKey("is_bottom_layout_enabled")
+        val SHOW_CONTROL_GRADIENTS = booleanPreferencesKey("show_control_gradients")
+        val SHOW_NEXT_PREV_BUTTONS = booleanPreferencesKey("show_next_prev_buttons")
+        val ASPECT_MODE = stringPreferencesKey("aspect_mode")
+        val BACKGROUND_PLAY_ENABLED = booleanPreferencesKey("background_play_enabled")
     }
 
     val playbackSettingsFlow: Flow<PlaybackSettings> = context.dataStore.data
@@ -154,7 +179,19 @@ class PlaybackSettingsRepository(private val context: Context) {
                 threeFingerAction = try { MultiFingerAction.valueOf(preferences[PreferencesKeys.THREE_FINGER_ACTION] ?: MultiFingerAction.FAST_PLAY.name) } catch (e: Exception) { MultiFingerAction.FAST_PLAY },
                 longPressEnabled = preferences[PreferencesKeys.LONG_PRESS_ENABLED] ?: true,
                 longPressSpeed = preferences[PreferencesKeys.LONG_PRESS_SPEED] ?: 2.0f,
-                doubleTapAction = try { DoubleTapAction.valueOf(preferences[PreferencesKeys.DOUBLE_TAP_ACTION] ?: DoubleTapAction.BOTH.name) } catch (e: Exception) { DoubleTapAction.BOTH }
+                doubleTapAction = try { DoubleTapAction.valueOf(preferences[PreferencesKeys.DOUBLE_TAP_ACTION] ?: DoubleTapAction.BOTH.name) } catch (e: Exception) { DoubleTapAction.BOTH },
+                topLeftControls = preferences[PreferencesKeys.TOP_LEFT_CONTROLS] ?: "BACK_ARROW,VIDEO_TITLE",
+                topRightControls = preferences[PreferencesKeys.TOP_RIGHT_CONTROLS] ?: "DECODER,SUBTITLES,AUDIO_TRACK,MORE_OPTIONS",
+                bottomLeftControls = preferences[PreferencesKeys.BOTTOM_LEFT_CONTROLS] ?: "LOCK_CONTROLS,PICTURE_IN_PICTURE",
+                bottomRightControls = preferences[PreferencesKeys.BOTTOM_RIGHT_CONTROLS] ?: "ASPECT_RATIO,SCREEN_ROTATION",
+                portraitTopLeftControls = preferences[PreferencesKeys.PORTRAIT_TOP_LEFT_CONTROLS] ?: "BACK_ARROW,VIDEO_TITLE",
+                portraitTopRightControls = preferences[PreferencesKeys.PORTRAIT_TOP_RIGHT_CONTROLS] ?: "SUBTITLES,AUDIO_TRACK,MORE_OPTIONS",
+                portraitBottomControls = preferences[PreferencesKeys.PORTRAIT_BOTTOM_CONTROLS] ?: "DECODER,ASPECT_RATIO,SCREEN_ROTATION,LOCK_CONTROLS,PICTURE_IN_PICTURE",
+                isBottomLayoutEnabled = preferences[PreferencesKeys.IS_BOTTOM_LAYOUT_ENABLED] ?: false,
+                showControlGradients = preferences[PreferencesKeys.SHOW_CONTROL_GRADIENTS] ?: true,
+                showNextPrevButtons = preferences[PreferencesKeys.SHOW_NEXT_PREV_BUTTONS] ?: true,
+                aspectMode = try { AspectMode.valueOf(preferences[PreferencesKeys.ASPECT_MODE] ?: AspectMode.FIT.name) } catch (e: Exception) { AspectMode.FIT },
+                backgroundPlayEnabled = preferences[PreferencesKeys.BACKGROUND_PLAY_ENABLED] ?: false
             )
         }
 
@@ -358,4 +395,17 @@ class PlaybackSettingsRepository(private val context: Context) {
     suspend fun updateLongPressEnabled(enabled: Boolean) { context.dataStore.edit { it[PreferencesKeys.LONG_PRESS_ENABLED] = enabled } }
     suspend fun updateLongPressSpeed(speed: Float) { context.dataStore.edit { it[PreferencesKeys.LONG_PRESS_SPEED] = speed } }
     suspend fun updateDoubleTapAction(action: DoubleTapAction) { context.dataStore.edit { it[PreferencesKeys.DOUBLE_TAP_ACTION] = action.name } }
+
+    suspend fun updateTopLeftControls(controls: String) { context.dataStore.edit { it[PreferencesKeys.TOP_LEFT_CONTROLS] = controls } }
+    suspend fun updateTopRightControls(controls: String) { context.dataStore.edit { it[PreferencesKeys.TOP_RIGHT_CONTROLS] = controls } }
+    suspend fun updateBottomLeftControls(controls: String) { context.dataStore.edit { it[PreferencesKeys.BOTTOM_LEFT_CONTROLS] = controls } }
+    suspend fun updateBottomRightControls(controls: String) { context.dataStore.edit { it[PreferencesKeys.BOTTOM_RIGHT_CONTROLS] = controls } }
+    suspend fun updatePortraitTopLeftControls(controls: String) { context.dataStore.edit { it[PreferencesKeys.PORTRAIT_TOP_LEFT_CONTROLS] = controls } }
+    suspend fun updatePortraitTopRightControls(controls: String) { context.dataStore.edit { it[PreferencesKeys.PORTRAIT_TOP_RIGHT_CONTROLS] = controls } }
+    suspend fun updatePortraitBottomControls(controls: String) { context.dataStore.edit { it[PreferencesKeys.PORTRAIT_BOTTOM_CONTROLS] = controls } }
+    suspend fun updateIsBottomLayoutEnabled(enabled: Boolean) { context.dataStore.edit { it[PreferencesKeys.IS_BOTTOM_LAYOUT_ENABLED] = enabled } }
+    suspend fun updateShowControlGradients(enabled: Boolean) { context.dataStore.edit { it[PreferencesKeys.SHOW_CONTROL_GRADIENTS] = enabled } }
+    suspend fun updateShowNextPrevButtons(enabled: Boolean) { context.dataStore.edit { it[PreferencesKeys.SHOW_NEXT_PREV_BUTTONS] = enabled } }
+    suspend fun updateAspectMode(mode: AspectMode) { context.dataStore.edit { it[PreferencesKeys.ASPECT_MODE] = mode.name } }
+    suspend fun updateBackgroundPlayEnabled(enabled: Boolean) { context.dataStore.edit { it[PreferencesKeys.BACKGROUND_PLAY_ENABLED] = enabled } }
 }

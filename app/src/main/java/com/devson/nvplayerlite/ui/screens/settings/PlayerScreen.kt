@@ -34,6 +34,7 @@ private fun String.toDisplayLabel(): String = this
 @Composable
 fun PlayerScreen(
     onBack: () -> Unit,
+    onNavigateToControlEditor: () -> Unit = {},
     settingsViewModel: SettingsViewModel = viewModel()
 ) {
     val playbackSettings  by settingsViewModel.playbackSettings.collectAsState()
@@ -94,6 +95,19 @@ fun PlayerScreen(
         ) {
             item { Spacer(Modifier.height(8.dp)) }
 
+            item { SettingsSectionLabel("Control Regions Layout Customization") }
+            item {
+                SettingsCard {
+                    SettingsClickRow(
+                        icon = Icons.Default.Dashboard,
+                        title = "Custom Controls Layout",
+                        subtitle = "Customize and reorder control buttons using an interactive player preview",
+                        onClick = onNavigateToControlEditor
+                    )
+                }
+                Spacer(Modifier.height(16.dp))
+            }
+
             item { SettingsSectionLabel("Player Control Settings") }
             item {
                 SettingsCard {
@@ -128,6 +142,87 @@ fun PlayerScreen(
                         onOptionSelected = {
                             settingsViewModel.updateSoftButtonMode(SoftButtonMode.valueOf(it))
                         }
+                    )
+                    SettingsDivider()
+                    SettingsRadioItem(
+                        icon = Icons.Default.PlayCircle,
+                        title = "Playback Control Position",
+                        subtitle = if (playbackSettings.isBottomLayoutEnabled) "Below Seekbar" else "Center",
+                        options = listOf("Center", "Below Seekbar"),
+                        selectedOption = if (playbackSettings.isBottomLayoutEnabled) "Below Seekbar" else "Center",
+                        onOptionSelected = {
+                            settingsViewModel.updateIsBottomLayoutEnabled(it == "Below Seekbar")
+                        }
+                    )
+                    SettingsDivider()
+                    SettingsRadioItem(
+                        icon = Icons.Default.PhotoSizeSelectLarge,
+                        title = "Controls Icon Size",
+                        subtitle = "Scale size of player control buttons",
+                        options = listOf("Small", "Medium", "Large"),
+                        selectedOption = playbackSettings.controlIconSize.lowercase().replaceFirstChar { it.uppercase() },
+                        onOptionSelected = {
+                            settingsViewModel.updateControlIconSize(it.lowercase())
+                        }
+                    )
+                    SettingsDivider()
+                    SettingsRadioItem(
+                        icon = Icons.Default.Waves,
+                        title = "Seekbar Style",
+                        subtitle = "Visual design of the playback progress bar",
+                        options = listOf("Standard", "Thick", "Slim", "Wavy"),
+                        selectedOption = playbackSettings.seekBarStyle.lowercase().replaceFirstChar { it.uppercase() },
+                        onOptionSelected = {
+                            settingsViewModel.updateSeekBarStyle(it.lowercase())
+                        }
+                    )
+                    SettingsDivider()
+                    SettingsToggleRow(
+                        icon = Icons.Default.SkipNext,
+                        title = "Auto-play Next Video",
+                        subtitle = "Automatically load and play next video in folder",
+                        checked = playbackSettings.autoPlayEnabled,
+                        onCheckedChange = { settingsViewModel.updateAutoPlayEnabled(it) }
+                    )
+                    SettingsDivider()
+                    SettingsToggleRow(
+                        icon = Icons.Default.FastForward,
+                        title = "Show Seek Buttons",
+                        subtitle = "Show fast forward and rewind seek buttons in player controls",
+                        checked = playbackSettings.showSeekButtons,
+                        onCheckedChange = { settingsViewModel.updateShowSeekButtons(it) }
+                    )
+                    SettingsDivider()
+                    SettingsToggleRow(
+                        icon = Icons.Default.SkipNext,
+                        title = "Show Skip Prev/Next Buttons",
+                        subtitle = "Show previous/next chapter skip buttons in player controls",
+                        checked = playbackSettings.showNextPrevButtons,
+                        onCheckedChange = { settingsViewModel.updateShowNextPrevButtons(it) }
+                    )
+                    SettingsDivider()
+                    SettingsToggleRow(
+                        icon = Icons.Default.HourglassBottom,
+                        title = "Show Remaining Time",
+                        subtitle = "Display remaining time instead of total duration",
+                        checked = playbackSettings.showRemainingTime,
+                        onCheckedChange = { settingsViewModel.updateShowRemainingTime(it) }
+                    )
+                    SettingsDivider()
+                    SettingsToggleRow(
+                        icon = Icons.Default.Gradient,
+                        title = "Controls Backdrop Dimming",
+                        subtitle = "Show top and bottom black fade behind player controls",
+                        checked = playbackSettings.showControlGradients,
+                        onCheckedChange = { settingsViewModel.updateShowControlGradients(it) }
+                    )
+                    SettingsDivider()
+                    SettingsToggleRow(
+                        icon = Icons.Default.Headphones,
+                        title = "Background Playback",
+                        subtitle = "Continue playing audio in background when exiting player",
+                        checked = playbackSettings.backgroundPlayEnabled,
+                        onCheckedChange = { settingsViewModel.updateBackgroundPlayEnabled(it) }
                     )
                 }
                 Spacer(Modifier.height(16.dp))
