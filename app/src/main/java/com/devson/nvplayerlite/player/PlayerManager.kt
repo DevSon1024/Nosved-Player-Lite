@@ -133,6 +133,10 @@ class PlayerManager(private val context: Context) {
     private val _selectedSubtitleIndex = MutableStateFlow(-1)
     val selectedSubtitleIndex: StateFlow<Int> = _selectedSubtitleIndex.asStateFlow()
 
+    // --- Chapters ---
+    private val _chapters = MutableStateFlow<List<com.devson.nvplayerlite.model.ChapterInfo>>(emptyList())
+    val chapters: StateFlow<List<com.devson.nvplayerlite.model.ChapterInfo>> = _chapters.asStateFlow()
+
     private val _isAudioBoostEnabled = MutableStateFlow(false)
     val isAudioBoostEnabled: StateFlow<Boolean> = _isAudioBoostEnabled.asStateFlow()
 
@@ -243,6 +247,36 @@ class PlayerManager(private val context: Context) {
 
                             _subtitleTracks.value = newSubtitleTracks
                             _selectedSubtitleIndex.value = currentSubIdx
+                        }
+
+                        override fun onMetadata(metadata: androidx.media3.common.Metadata) {
+                            super.onMetadata(metadata)
+                            val list = mutableListOf<com.devson.nvplayerlite.model.ChapterInfo>()
+                            for (i in 0 until metadata.length()) {
+                                val entry = metadata.get(i)
+                                if (entry is androidx.media3.extractor.metadata.id3.ChapterFrame) {
+                                    var title = entry.chapterId.ifEmpty { "Chapter ${list.size + 1}" }
+                                    for (j in 0 until entry.subFrameCount) {
+                                        val sub = entry.getSubFrame(j)
+                                        if (sub is androidx.media3.extractor.metadata.id3.TextInformationFrame) {
+                                            sub.values.firstOrNull()?.let { title = it }
+                                            break
+                                        }
+                                    }
+                                    list.add(
+                                        com.devson.nvplayerlite.model.ChapterInfo(
+                                            index = list.size,
+                                            title = title,
+                                            timeMs = entry.startTimeMs.toLong()
+                                        )
+                                    )
+                                }
+                            }
+                            if (list.isNotEmpty()) {
+                                _chapters.value = list.sortedBy { it.timeMs }.mapIndexed { idx, item ->
+                                    item.copy(index = idx)
+                                }
+                            }
                         }
 
                         override fun onPlayerError(error: PlaybackException) {
@@ -405,6 +439,7 @@ class PlayerManager(private val context: Context) {
     fun playVideo(video: Video) {
         val player = exoPlayer ?: return
         _playerError.value = null
+        _chapters.value = emptyList()
         val mediaItem = MediaItem.fromUri(video.uri)
         player.setMediaItem(mediaItem)
         player.prepare()

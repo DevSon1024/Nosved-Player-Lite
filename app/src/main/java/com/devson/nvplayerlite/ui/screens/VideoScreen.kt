@@ -69,12 +69,14 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.activity.compose.BackHandler
 import androidx.media3.ui.AspectRatioFrameLayout
-import com.devson.nvplayerlite.ui.components.AudioTrackSheet
-import com.devson.nvplayerlite.ui.components.SubtitleSheet
 import com.devson.nvplayerlite.ui.components.InformationBottomSheet
-import com.devson.nvplayerlite.ui.components.PlaybackSettingsSheet
 import com.devson.nvplayerlite.ui.components.ComposeSubtitleOverlay
-import com.devson.nvplayerlite.ui.components.PlaybackSpeedSheet
+import com.devson.nvplayerlite.ui.components.sheets.PlayerSettingsSideSheet
+import com.devson.nvplayerlite.ui.components.sheets.AudioSettingsSideSheet
+import com.devson.nvplayerlite.ui.components.sheets.SubtitleSettingsSideSheet
+import com.devson.nvplayerlite.ui.components.sheets.DecoderSideSheet
+import com.devson.nvplayerlite.ui.components.sheets.ChaptersSideSheet
+import com.devson.nvplayerlite.model.PlayerSettingsActions
 import com.devson.nvplayerlite.util.formatDuration
 import com.devson.nvplayerlite.viewmodel.VideoViewModel
 import com.devson.nvplayerlite.viewmodel.SettingsViewModel
@@ -190,36 +192,41 @@ fun VideoScreen(
 
     var isSubtitleGestureEnabled by rememberSaveable { mutableStateOf(true) }
 
-    // Modals state (used only in default mode; Modern mode handles tracks inline)
-    var showAudioSheet by remember { mutableStateOf(false) }
-    @kotlin.OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
-    val audioSheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    // Chapters state
+    val chapters by viewModel.chapters?.collectAsState(initial = emptyList()) ?: remember { mutableStateOf(emptyList()) }
+    val hasChapters = chapters.isNotEmpty()
 
-    var showSubtitleSheet by remember { mutableStateOf(false) }
-    @kotlin.OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
-    val subtitleSheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true)
-
-    // Shared playback-settings sheet (both Modern and default style use the same sheet)
-    var showPlaybackSettingsSheet by remember { mutableStateOf(false) }
-    @kotlin.OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
-    val playbackSettingsSheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    // Side sheet states from NosvedPlayer
+    var showPlayerSettingsSideSheet by rememberSaveable { mutableStateOf(false) }
+    var showAudioSettingsSideSheet by rememberSaveable { mutableStateOf(false) }
+    var showSubtitleSettingsSideSheet by rememberSaveable { mutableStateOf(false) }
+    var showDecoderSideSheet by rememberSaveable { mutableStateOf(false) }
+    var showChaptersSideSheet by rememberSaveable { mutableStateOf(false) }
 
     var showInfoSheet by remember { mutableStateOf(false) }
-    var showSpeedSheet by remember { mutableStateOf(false) }
 
-    val shouldInterceptBack = isLocked || showPlaybackSettingsSheet || showAudioSheet || showSubtitleSheet || showSpeedSheet || showInfoSheet
+    val isAnySideSheetVisible = showPlayerSettingsSideSheet ||
+            showAudioSettingsSideSheet ||
+            showSubtitleSettingsSideSheet ||
+            showDecoderSideSheet ||
+            showChaptersSideSheet ||
+            showInfoSheet
+
+    val shouldInterceptBack = isLocked || isAnySideSheetVisible
 
     val handleBack: () -> Unit = {
         if (isLocked) {
             showUnlockButton = true
-        } else if (showPlaybackSettingsSheet) {
-            showPlaybackSettingsSheet = false
-        } else if (showAudioSheet) {
-            showAudioSheet = false
-        } else if (showSubtitleSheet) {
-            showSubtitleSheet = false
-        } else if (showSpeedSheet) {
-            showSpeedSheet = false
+        } else if (showPlayerSettingsSideSheet) {
+            showPlayerSettingsSideSheet = false
+        } else if (showAudioSettingsSideSheet) {
+            showAudioSettingsSideSheet = false
+        } else if (showSubtitleSettingsSideSheet) {
+            showSubtitleSettingsSideSheet = false
+        } else if (showDecoderSideSheet) {
+            showDecoderSideSheet = false
+        } else if (showChaptersSideSheet) {
+            showChaptersSideSheet = false
         } else if (showInfoSheet) {
             showInfoSheet = false
         } else {
@@ -229,6 +236,39 @@ fun VideoScreen(
 
     BackHandler(enabled = shouldInterceptBack) {
         handleBack()
+    }
+
+    val playerSettingsActions = remember(viewModel, settingsViewModel) {
+        PlayerSettingsActions(
+            onSpeedSelected = { viewModel.setPlaybackSpeed(it) },
+            onUpdateDoubleTapAction = { settingsViewModel.updateDoubleTapAction(it) },
+            onUpdateDoubleTapSeekDuration = { settingsViewModel.updateDoubleTapSeekDuration(it) },
+            onUpdateTwoFingerAction = { settingsViewModel.updateTwoFingerAction(it) },
+            onUpdateThreeFingerAction = { settingsViewModel.updateThreeFingerAction(it) },
+            onUpdateLongPressEnabled = { settingsViewModel.updateLongPressEnabled(it) },
+            onUpdateLongPressSpeed = { settingsViewModel.updateLongPressSpeed(it) },
+            onUpdateTapAndHoldSpeed = { settingsViewModel.updateTapAndHoldSpeed(it) },
+            onUpdateOrientationMode = { settingsViewModel.updateOrientationMode(it) },
+            onUpdateFullScreenMode = { settingsViewModel.updateFullScreenMode(it) },
+            onUpdateAspectMode = { settingsViewModel.updateAspectMode(it) },
+            onUpdateSoftButtonMode = { settingsViewModel.updateSoftButtonMode(it) },
+            onUpdateControlIconSize = { settingsViewModel.updateControlIconSize(it) },
+            onUpdateSeekBarStyle = { settingsViewModel.updateSeekBarStyle(it) },
+            onUpdateAutoPlayEnabled = { settingsViewModel.updateAutoPlayEnabled(it) },
+            onUpdateShowSeekButtons = { settingsViewModel.updateShowSeekButtons(it) },
+            onUpdateShowNextPrevButtons = { settingsViewModel.updateShowNextPrevButtons(it) },
+            onUpdateShowRemainingTime = { settingsViewModel.updateShowRemainingTime(it) },
+            onUpdateShowBatteryClockOverlay = { settingsViewModel.updateShowBatteryClockOverlay(it) },
+            onUpdatePauseWhenObstructed = { settingsViewModel.updatePauseWhenObstructed(it) },
+            onUpdateKeepAwakeAlways = { settingsViewModel.updateKeepAwakeAlways(it) },
+            onUpdateShowUpNextQueue = { settingsViewModel.updateShowUpNextQueue(it) },
+            onUpdateIsAmbientModeEnabled = { settingsViewModel.updateIsAmbientModeEnabled(it) },
+            onUpdateAmbientBlurStyle = { settingsViewModel.updateAmbientBlurStyle(it) },
+            onUpdateSaveBrightnessLevel = { settingsViewModel.updateSaveBrightnessLevel(it) },
+            onUpdateIsBottomLayoutEnabled = { settingsViewModel.updateIsBottomLayoutEnabled(it) },
+            onUpdateShowControlGradients = { settingsViewModel.updateShowControlGradients(it) },
+            onUpdateBackgroundPlayEnabled = { settingsViewModel.updateBackgroundPlayEnabled(it) }
+        )
     }
 
     // Encoding state for the external subtitle picker
@@ -489,7 +529,7 @@ fun VideoScreen(
             twoFingerAction = playbackSettings.twoFingerAction,
             threeFingerAction = playbackSettings.threeFingerAction,
             longPressEnabled = playbackSettings.longPressEnabled,
-            longPressSpeed = playbackSettings.longPressSpeed,
+            longPressSpeed = playbackSettings.tapAndHoldSpeed.takeIf { it > 0f } ?: playbackSettings.longPressSpeed,
             doubleTapAction = playbackSettings.doubleTapAction,
 
             onSingleTap = { viewModel.toggleControlsVisibility() },
@@ -630,7 +670,7 @@ fun VideoScreen(
         if (useModernStyle) {
             // Capsule-style player controls from NosvedPlayer with custom control region positioning
             AnimatedVisibility(
-                visible = controlsVisible && !isLocked,
+                visible = controlsVisible && !isLocked && !isAnySideSheetVisible,
                 enter = fadeIn(animationSpec = tween(200)),
                 exit = fadeOut(animationSpec = tween(200))
             ) {
@@ -651,26 +691,28 @@ fun VideoScreen(
                         viewModel.showControlsAndDelayHide()
                     },
                     onBackClick = { handleBack() },
-                    onSpeedClick = { showSpeedSheet = true },
+                    onSpeedClick = {
+                        showPlayerSettingsSideSheet = true
+                        viewModel.showControlsAndDelayHide()
+                    },
                     onShowDecoder = {
-                        val nextDecoder = when (currentDecoder) {
-                            com.devson.nvplayerlite.repository.DecoderMode.HW -> com.devson.nvplayerlite.repository.DecoderMode.HW_PLUS
-                            com.devson.nvplayerlite.repository.DecoderMode.HW_PLUS -> com.devson.nvplayerlite.repository.DecoderMode.SW
-                            com.devson.nvplayerlite.repository.DecoderMode.SW -> com.devson.nvplayerlite.repository.DecoderMode.HW
-                        }
-                        viewModel.setDecoderMode(nextDecoder)
-                        Toast.makeText(context, "Decoder: ${nextDecoder.displayName}", Toast.LENGTH_SHORT).show()
+                        showDecoderSideSheet = true
                         viewModel.showControlsAndDelayHide()
                     },
                     currentDecoder = currentDecoder.displayName,
                     onCycleSubtitle = {
-                        showSubtitleSheet = true
+                        showSubtitleSettingsSideSheet = true
                         viewModel.showControlsAndDelayHide()
                     },
                     onCycleAudio = {
-                        showAudioSheet = true
+                        showAudioSettingsSideSheet = true
                         viewModel.showControlsAndDelayHide()
                     },
+                    onShowChapters = {
+                        showChaptersSideSheet = true
+                        viewModel.showControlsAndDelayHide()
+                    },
+                    hasChapters = hasChapters,
                     onLockClick = {
                         isLocked = true
                         showUnlockButton = true
@@ -748,7 +790,7 @@ fun VideoScreen(
         } else {
             //  Default controls 
             PlayerControls(
-                isVisible = controlsVisible,
+                isVisible = controlsVisible && !isAnySideSheetVisible,
                 isPlaying = playingIntent,
                 title = currentVideo?.title ?: "",
                 currentPosition = displayedPosition,
@@ -799,8 +841,8 @@ fun VideoScreen(
                     showInfoSheet = true
                     viewModel.showControlsAndDelayHide()
                 },
-                onOpenAudioTracks = { showAudioSheet = true },
-                onOpenSubtitles = { showSubtitleSheet = true },
+                onOpenAudioTracks = { showAudioSettingsSideSheet = true },
+                onOpenSubtitles = { showSubtitleSettingsSideSheet = true },
                 onPlayPrevious = { viewModel.playPreviousVideo() },
                 onPlayNext = { viewModel.playNextVideo() },
                 isLandscape = isLandscape,
@@ -819,7 +861,7 @@ fun VideoScreen(
                 showRemainingTime = showRemainingTime,
                 onShowRemainingTimeChange = { settingsViewModel.updateShowRemainingTime(it) },
                 currentDecoder = currentDecoder,
-                onSelectDecoder = { viewModel.setDecoderMode(it) },
+                onSelectDecoder = { showDecoderSideSheet = true },
                 onToggleScreenRotation = {
                     val currentMode = activity?.requestedOrientation
                     if (currentMode == ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE || currentMode == ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE) {
@@ -830,83 +872,71 @@ fun VideoScreen(
                     viewModel.showControlsAndDelayHide()
                 },
                 onScrubbingModeChange = { viewModel.setScrubbingMode(it) },
-                onSpeedMenuClick = { showSpeedSheet = true }
+                onSpeedMenuClick = { showPlayerSettingsSideSheet = true }
             )
         }
     }
 
-    //  Modals - shared between both player styles 
+    //  Nosved Player Side Sheets 
 
-    @kotlin.OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
-    AudioTrackSheet(
-        showSheet = showAudioSheet,
-        sheetState = audioSheetState,
+    PlayerSettingsSideSheet(
+        visible = showPlayerSettingsSideSheet,
+        currentSpeed = currentPlaybackSpeed,
+        playbackSettings = playbackSettings,
+        currentVideo = currentVideo,
+        actions = playerSettingsActions,
+        onDismiss = { showPlayerSettingsSideSheet = false }
+    )
+
+    AudioSettingsSideSheet(
+        visible = showAudioSettingsSideSheet,
         audioTracks = audioTracks,
-        selectedTrackIndex = selectedAudioIndex,
-        isLandscape = isLandscape,
-        isAudioBoostEnabled = isAudioBoostEnabled,
-        onToggleAudioBoost = { viewModel.toggleAudioBoost(it) },
-        onSelectTrack = { viewModel.selectAudioTrack(it) },
-        onDismissRequest = { showAudioSheet = false }
+        audioBoosterEnabled = isAudioBoostEnabled,
+        onToggleAudioBooster = { viewModel.toggleAudioBoost(it) },
+        onSelectAudioTrack = { viewModel.selectAudioTrack(it) },
+        onDismiss = { showAudioSettingsSideSheet = false }
     )
 
-    @kotlin.OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
-    SubtitleSheet(
-        showSheet = showSubtitleSheet,
-        sheetState = subtitleSheetState,
+    SubtitleSettingsSideSheet(
+        visible = showSubtitleSettingsSideSheet,
+        playbackSettings = playbackSettings,
         subtitleTracks = subtitleTracks,
-        selectedTrackIndex = selectedSubtitleIndex,
-        textSizeScale = subtitleTextSizeScale,
-        bgStyle = subtitleBgStyle,
-        useSystemCaptionStyle = playbackSettings.useSystemCaptionStyle,
-        subtitleFont = playbackSettings.subtitleFont,
-        isSubtitleBold = playbackSettings.isSubtitleBold,
-        forceAssSubtitleOverride = playbackSettings.forceAssSubtitleOverride,
-        isSubtitleGestureEnabled = isSubtitleGestureEnabled,
-        isLandscape = isLandscape,
-        subtitleDelayMs = subtitleDelayMs,
-        subtitleVerticalOffset = subtitleVerticalOffset,
-        onSelectTrack = { viewModel.selectSubtitleTrack(it) },
-        onPickExternalSubtitle = { externalSubtitleLauncher.launch("*/*") },
-        onTextSizeChange = { viewModel.updateSubtitleTextSizeScale(it) },
-        onBgStyleChange = { viewModel.updateSubtitleBgStyle(it) },
-        onUseSystemCaptionStyleChange = { settingsViewModel.updateUseSystemCaptionStyle(it) },
-        onSubtitleFontChange = { settingsViewModel.updateSubtitleFont(it) },
-        onIsSubtitleBoldChange = { settingsViewModel.updateIsSubtitleBold(it) },
-        onForceAssSubtitleOverrideChange = { settingsViewModel.updateForceAssSubtitleOverride(it) },
-        onSubtitleGestureEnabledChange = { isSubtitleGestureEnabled = it },
-        onSubtitleDelayChange = { viewModel.setSubtitleDelayMs(it) },
-        onSubtitleVerticalOffsetChange = { viewModel.setSubtitleVerticalOffset(it) },
-        onPickExternalSubtitleWithEncoding = { encoding ->
-            pendingExternalEncoding = encoding
-            externalSubtitleLauncher.launch("*/*")
-        },
-        onDismissRequest = { showSubtitleSheet = false }
+        onSelectSubtitleTrack = { viewModel.selectSubtitleTrack(it) },
+        onSetSubtitleDelay = { viewModel.setSubtitleDelayMs(it) },
+        onUpdateSubtitleFont = { settingsViewModel.updateSubtitleFont(it) },
+        onUpdateIsSubtitleBold = { settingsViewModel.updateIsSubtitleBold(it) },
+        onUpdateForceAssSubtitleOverride = { settingsViewModel.updateForceAssSubtitleOverride(it) },
+        onUpdateSubtitleTextSizeScale = { viewModel.updateSubtitleTextSizeScale(it) },
+        onUpdateSubtitleBgStyle = { viewModel.updateSubtitleBgStyle(it) },
+        onUpdateSubtitleDelay = { viewModel.setSubtitleDelayMs(it) },
+        onUpdateSubtitleVerticalOffset = { viewModel.setSubtitleVerticalOffset(it) },
+        onUpdateSubtitleGesturesEnabled = { isSubtitleGestureEnabled = it },
+        onDismiss = { showSubtitleSettingsSideSheet = false },
+        onImportSubtitleClick = { externalSubtitleLauncher.launch("*/*") }
     )
 
-    //  Shared Playback Settings Sheet (same sheet for both player styles) 
-    @kotlin.OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
-    PlaybackSettingsSheet(
-        showSettingsSheet = showPlaybackSettingsSheet,
-        sheetState = playbackSettingsSheetState,
-        seekDurationSeconds = seekDurationSeconds,
-        seekBarStyle = seekBarStyle,
-        controlIconSize = controlIconSize,
-        autoPlayEnabled = autoPlayEnabled,
-        useModernStyle = useModernStyle,
-        showSeekButtons = showSeekButtons,
-        fastplaySpeed = fastplaySpeed,
-        isLandscape = isLandscape,
-        onDismissRequest = { showPlaybackSettingsSheet = false },
-        onSeekDurationChange = { viewModel.setSeekDuration(it) },
-        onSeekBarStyleChange = { viewModel.setSeekBarStyle(it) },
-        onControlIconSizeChange = { viewModel.setControlIconSize(it) },
-        onAutoPlayChange = { viewModel.setAutoPlayEnabled(it) },
-        onModernStyleChange = { settingsViewModel.setModernPlayerStyle(it) },
-        onShowSeekButtonsChange = { viewModel.setShowSeekButtons(it) },
-        onFastplaySpeedChange = { viewModel.setFastplaySpeed(it) },
-        showStats = showStats,
-        onShowStatsChange = { viewModel.setShowStats(it) }
+    DecoderSideSheet(
+        visible = showDecoderSideSheet,
+        currentMode = currentDecoder,
+        onSelectMode = { mode ->
+            viewModel.setDecoderMode(mode)
+            showDecoderSideSheet = false
+        },
+        onDismiss = { showDecoderSideSheet = false }
+    )
+
+    ChaptersSideSheet(
+        visible = showChaptersSideSheet,
+        chapters = chapters,
+        currentPositionMs = displayedPosition,
+        currentPositionProvider = { displayedPosition },
+        onSelectChapter = { index ->
+            chapters.getOrNull(index)?.let { ch ->
+                viewModel.seekTo(ch.timeMs)
+            }
+            showChaptersSideSheet = false
+        },
+        onDismiss = { showChaptersSideSheet = false }
     )
 
     if (showInfoSheet) {
@@ -917,14 +947,6 @@ fun VideoScreen(
             useSideSheet = true
         )
     }
-
-    PlaybackSpeedSheet(
-        showSheet = showSpeedSheet,
-        speed = currentPlaybackSpeed,
-        isLandscape = isLandscape,
-        onSpeedChange = { viewModel.setPlaybackSpeed(it) },
-        onDismiss = { showSpeedSheet = false }
-    )
 }
 
 private fun hideSystemUI(activity: Activity) {

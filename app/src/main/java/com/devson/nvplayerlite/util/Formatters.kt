@@ -48,6 +48,8 @@ fun formatSize(sizeBytes: Long): String {
     return String.format(Locale.getDefault(), "%.1f %s", sizeBytes / 1024.0.pow(digitGroups.toDouble()), units[digitGroups])
 }
 
+fun formatTime(timeMs: Long): String = formatDuration(timeMs)
+
 fun formatDuration(durationMs: Long): String {
     val totalSeconds = durationMs / 1000
     val hours = totalSeconds / 3600

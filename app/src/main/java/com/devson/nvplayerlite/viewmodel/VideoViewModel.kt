@@ -61,6 +61,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     val subtitleTracks get() = playerManager?.subtitleTracks
     val selectedSubtitleIndex get() = playerManager?.selectedSubtitleIndex
 
+    val chapters get() = playerManager?.chapters
     val isAudioBoostEnabled get() = playerManager?.isAudioBoostEnabled
 
     // --- Seek Preview State (MX-style 3-phase seek) ---

@@ -369,6 +369,62 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch { settingsRepo.updateBackgroundPlayEnabled(enabled) }
     }
 
+    fun updateTapAndHoldSpeed(speed: Float) {
+        viewModelScope.launch { settingsRepo.updateTapAndHoldSpeed(speed) }
+    }
+
+    fun updateDoubleTapSeekDuration(durationMs: Long) {
+        viewModelScope.launch { settingsRepo.updateDoubleTapSeekDuration(durationMs) }
+    }
+
+    fun updateKeepAwakeAlways(enabled: Boolean) {
+        viewModelScope.launch { settingsRepo.updateKeepAwakeAlways(enabled) }
+    }
+
+    fun updateShowUpNextQueue(show: Boolean) {
+        viewModelScope.launch { settingsRepo.updateShowUpNextQueue(show) }
+    }
+
+    fun updateIsAmbientModeEnabled(enabled: Boolean) {
+        viewModelScope.launch { settingsRepo.updateIsAmbientModeEnabled(enabled) }
+    }
+
+    fun updateAmbientBlurStyle(style: String) {
+        viewModelScope.launch { settingsRepo.updateAmbientBlurStyle(style) }
+    }
+
+    fun updateSaveBrightnessLevel(save: Boolean) {
+        viewModelScope.launch { settingsRepo.updateSaveBrightnessLevel(save) }
+    }
+
+    fun updateDecoderMode(mode: com.devson.nvplayerlite.repository.DecoderMode) {
+        viewModelScope.launch { settingsRepo.updateDecoderMode(mode) }
+    }
+
+    fun updateAudioBoosterEnabled(enabled: Boolean) {
+        viewModelScope.launch { settingsRepo.updateAudioBoosterEnabled(enabled) }
+    }
+
+    fun updateSubtitleTextSizeScale(scale: Float) {
+        viewModelScope.launch { settingsRepo.updateSubtitleTextSizeScale(scale) }
+    }
+
+    fun updateSubtitleBgStyle(style: Int) {
+        viewModelScope.launch { settingsRepo.updateSubtitleBgStyle(style) }
+    }
+
+    fun updateSubtitleDelayMs(delayMs: Long) {
+        viewModelScope.launch { settingsRepo.updateSubtitleDelayMs(delayMs) }
+    }
+
+    fun updateSubtitleVerticalOffset(offset: Float) {
+        viewModelScope.launch { settingsRepo.updateSubtitleVerticalOffset(offset) }
+    }
+
+    fun updateSubtitleGesturesEnabled(enabled: Boolean) {
+        viewModelScope.launch { settingsRepo.updateSubtitleGesturesEnabled(enabled) }
+    }
+
     fun updateDoubleTapAction(action: com.devson.nvplayerlite.repository.DoubleTapAction) {
         viewModelScope.launch { settingsRepo.updateDoubleTapAction(action) }
     }

@@ -78,7 +78,20 @@ data class PlaybackSettings(
     val showControlGradients: Boolean = true,
     val showNextPrevButtons: Boolean = true,
     val aspectMode: AspectMode = AspectMode.FIT,
-    val backgroundPlayEnabled: Boolean = false
+    val backgroundPlayEnabled: Boolean = false,
+    val subtitleTextSizeScale: Float = 1.0f,
+    val subtitleBgStyle: Int = 1,
+    val subtitleDelayMs: Long = 0L,
+    val subtitleVerticalOffset: Float = 0f,
+    val subtitleGesturesEnabled: Boolean = true,
+    val tapAndHoldSpeed: Float = 2.0f,
+    val doubleTapSeekDuration: Long = 10000L,
+    val keepAwakeAlways: Boolean = false,
+    val audioBoosterEnabled: Boolean = false,
+    val showUpNextQueue: Boolean = true,
+    val isAmbientModeEnabled: Boolean = false,
+    val ambientBlurStyle: String = "standard",
+    val saveBrightnessLevel: Boolean = true
 )
 
 class PlaybackSettingsRepository(private val context: Context) {
@@ -141,6 +154,19 @@ class PlaybackSettingsRepository(private val context: Context) {
         val SHOW_NEXT_PREV_BUTTONS = booleanPreferencesKey("show_next_prev_buttons")
         val ASPECT_MODE = stringPreferencesKey("aspect_mode")
         val BACKGROUND_PLAY_ENABLED = booleanPreferencesKey("background_play_enabled")
+        val SUBTITLE_TEXT_SIZE_SCALE = floatPreferencesKey("subtitle_text_size_scale")
+        val SUBTITLE_BG_STYLE = intPreferencesKey("subtitle_bg_style")
+        val SUBTITLE_DELAY_MS = androidx.datastore.preferences.core.longPreferencesKey("subtitle_delay_ms")
+        val SUBTITLE_VERTICAL_OFFSET = floatPreferencesKey("subtitle_vertical_offset")
+        val SUBTITLE_GESTURES_ENABLED = booleanPreferencesKey("subtitle_gestures_enabled")
+        val TAP_AND_HOLD_SPEED = floatPreferencesKey("tap_and_hold_speed")
+        val DOUBLE_TAP_SEEK_DURATION = androidx.datastore.preferences.core.longPreferencesKey("double_tap_seek_duration")
+        val KEEP_AWAKE_ALWAYS = booleanPreferencesKey("keep_awake_always")
+        val AUDIO_BOOSTER_ENABLED = booleanPreferencesKey("audio_booster_enabled")
+        val SHOW_UP_NEXT_QUEUE = booleanPreferencesKey("show_up_next_queue")
+        val IS_AMBIENT_MODE_ENABLED = booleanPreferencesKey("is_ambient_mode_enabled")
+        val AMBIENT_BLUR_STYLE = stringPreferencesKey("ambient_blur_style")
+        val SAVE_BRIGHTNESS_LEVEL = booleanPreferencesKey("save_brightness_level")
     }
 
     val playbackSettingsFlow: Flow<PlaybackSettings> = context.dataStore.data
@@ -191,7 +217,20 @@ class PlaybackSettingsRepository(private val context: Context) {
                 showControlGradients = preferences[PreferencesKeys.SHOW_CONTROL_GRADIENTS] ?: true,
                 showNextPrevButtons = preferences[PreferencesKeys.SHOW_NEXT_PREV_BUTTONS] ?: true,
                 aspectMode = try { AspectMode.valueOf(preferences[PreferencesKeys.ASPECT_MODE] ?: AspectMode.FIT.name) } catch (e: Exception) { AspectMode.FIT },
-                backgroundPlayEnabled = preferences[PreferencesKeys.BACKGROUND_PLAY_ENABLED] ?: false
+                backgroundPlayEnabled = preferences[PreferencesKeys.BACKGROUND_PLAY_ENABLED] ?: false,
+                subtitleTextSizeScale = preferences[PreferencesKeys.SUBTITLE_TEXT_SIZE_SCALE] ?: 1.0f,
+                subtitleBgStyle = preferences[PreferencesKeys.SUBTITLE_BG_STYLE] ?: 1,
+                subtitleDelayMs = preferences[PreferencesKeys.SUBTITLE_DELAY_MS] ?: 0L,
+                subtitleVerticalOffset = preferences[PreferencesKeys.SUBTITLE_VERTICAL_OFFSET] ?: 0f,
+                subtitleGesturesEnabled = preferences[PreferencesKeys.SUBTITLE_GESTURES_ENABLED] ?: true,
+                tapAndHoldSpeed = preferences[PreferencesKeys.TAP_AND_HOLD_SPEED] ?: 2.0f,
+                doubleTapSeekDuration = preferences[PreferencesKeys.DOUBLE_TAP_SEEK_DURATION] ?: 10000L,
+                keepAwakeAlways = preferences[PreferencesKeys.KEEP_AWAKE_ALWAYS] ?: false,
+                audioBoosterEnabled = preferences[PreferencesKeys.AUDIO_BOOSTER_ENABLED] ?: false,
+                showUpNextQueue = preferences[PreferencesKeys.SHOW_UP_NEXT_QUEUE] ?: true,
+                isAmbientModeEnabled = preferences[PreferencesKeys.IS_AMBIENT_MODE_ENABLED] ?: false,
+                ambientBlurStyle = preferences[PreferencesKeys.AMBIENT_BLUR_STYLE] ?: "standard",
+                saveBrightnessLevel = preferences[PreferencesKeys.SAVE_BRIGHTNESS_LEVEL] ?: true
             )
         }
 
@@ -408,4 +447,17 @@ class PlaybackSettingsRepository(private val context: Context) {
     suspend fun updateShowNextPrevButtons(enabled: Boolean) { context.dataStore.edit { it[PreferencesKeys.SHOW_NEXT_PREV_BUTTONS] = enabled } }
     suspend fun updateAspectMode(mode: AspectMode) { context.dataStore.edit { it[PreferencesKeys.ASPECT_MODE] = mode.name } }
     suspend fun updateBackgroundPlayEnabled(enabled: Boolean) { context.dataStore.edit { it[PreferencesKeys.BACKGROUND_PLAY_ENABLED] = enabled } }
+    suspend fun updateSubtitleTextSizeScale(scale: Float) { context.dataStore.edit { it[PreferencesKeys.SUBTITLE_TEXT_SIZE_SCALE] = scale } }
+    suspend fun updateSubtitleBgStyle(style: Int) { context.dataStore.edit { it[PreferencesKeys.SUBTITLE_BG_STYLE] = style } }
+    suspend fun updateSubtitleDelayMs(delayMs: Long) { context.dataStore.edit { it[PreferencesKeys.SUBTITLE_DELAY_MS] = delayMs } }
+    suspend fun updateSubtitleVerticalOffset(offset: Float) { context.dataStore.edit { it[PreferencesKeys.SUBTITLE_VERTICAL_OFFSET] = offset } }
+    suspend fun updateSubtitleGesturesEnabled(enabled: Boolean) { context.dataStore.edit { it[PreferencesKeys.SUBTITLE_GESTURES_ENABLED] = enabled } }
+    suspend fun updateTapAndHoldSpeed(speed: Float) { context.dataStore.edit { it[PreferencesKeys.TAP_AND_HOLD_SPEED] = speed } }
+    suspend fun updateDoubleTapSeekDuration(durationMs: Long) { context.dataStore.edit { it[PreferencesKeys.DOUBLE_TAP_SEEK_DURATION] = durationMs } }
+    suspend fun updateKeepAwakeAlways(enabled: Boolean) { context.dataStore.edit { it[PreferencesKeys.KEEP_AWAKE_ALWAYS] = enabled } }
+    suspend fun updateAudioBoosterEnabled(enabled: Boolean) { context.dataStore.edit { it[PreferencesKeys.AUDIO_BOOSTER_ENABLED] = enabled } }
+    suspend fun updateShowUpNextQueue(show: Boolean) { context.dataStore.edit { it[PreferencesKeys.SHOW_UP_NEXT_QUEUE] = show } }
+    suspend fun updateIsAmbientModeEnabled(enabled: Boolean) { context.dataStore.edit { it[PreferencesKeys.IS_AMBIENT_MODE_ENABLED] = enabled } }
+    suspend fun updateAmbientBlurStyle(style: String) { context.dataStore.edit { it[PreferencesKeys.AMBIENT_BLUR_STYLE] = style } }
+    suspend fun updateSaveBrightnessLevel(save: Boolean) { context.dataStore.edit { it[PreferencesKeys.SAVE_BRIGHTNESS_LEVEL] = save } }
 }
