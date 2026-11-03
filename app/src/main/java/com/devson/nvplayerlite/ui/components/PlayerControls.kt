@@ -1,5 +1,6 @@
 package com.devson.nvplayerlite.ui.components
 
+import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -7,6 +8,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -109,6 +111,7 @@ fun PlayerControls(
     title: String,
     currentPosition: Long,
     duration: Long,
+    videoUri: Uri? = null,
     onPlayPauseToggle: () -> Unit,
     onSeekTo: (Long) -> Unit,
     onControlsStateChange: () -> Unit,
@@ -388,6 +391,35 @@ fun PlayerControls(
 
                     val effectivePosition = if (isDragging) sliderPosition.toLong() else currentPosition
 
+                    val safeDuration = if (duration > 0) duration.toFloat() else 100f
+                    val safeValueRange = 0f..safeDuration
+                    val safeSliderPosition = sliderPosition.coerceIn(0f, safeDuration)
+
+                    // Floating Live Scrub Frame Preview
+                    if (isDragging) {
+                        BoxWithConstraints(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(88.dp)
+                                .padding(bottom = 4.dp)
+                        ) {
+                            val cardWidth = 140.dp
+                            val maxOffset = (maxWidth - cardWidth).coerceAtLeast(0.dp)
+                            val scrubFraction = if (safeDuration > 0f) {
+                                (safeSliderPosition / safeDuration).coerceIn(0f, 1f)
+                            } else 0f
+                            val offsetX = maxOffset * scrubFraction
+
+                            SeekPreviewCard(
+                                videoUri = videoUri,
+                                timestampMs = effectivePosition,
+                                modifier = Modifier
+                                    .offset(x = offsetX)
+                                    .align(Alignment.BottomStart)
+                            )
+                        }
+                    }
+
                     // Row 1: Time + Seekbar + Time
                     Row(
                         modifier = Modifier.fillMaxWidth().offset(y = (-6).dp),
@@ -399,10 +431,6 @@ fun PlayerControls(
                             style = MaterialTheme.typography.labelMedium
                         )
                         Spacer(Modifier.width(8.dp))
-
-                        val safeDuration = if (duration > 0) duration.toFloat() else 100f
-                        val safeValueRange = 0f..safeDuration
-                        val safeSliderPosition = sliderPosition.coerceIn(0f, safeDuration)
 
                         if (seekBarStyle == SeekBarStyle.FLAT) {
                             FlatSeekBar(

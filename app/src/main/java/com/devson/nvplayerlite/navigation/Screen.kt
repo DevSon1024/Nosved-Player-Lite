@@ -2,7 +2,7 @@ package com.devson.nvplayerlite.navigation
 
 import kotlinx.serialization.Serializable
 
-// --- Existing string-route sealed class ---
+// Existing string-route sealed class
 // All current destinations are preserved as-is. Do NOT remove or rename them.
 sealed class Screen(val route: String) {
     object Onboarding : Screen("onboarding")
@@ -11,6 +11,7 @@ sealed class Screen(val route: String) {
     object Settings   : Screen("settings")
     object Appearance : Screen("appearance")
     object About      : Screen("about")
+    object Credits    : Screen("credits")
     object Logs       : Screen("logs")
     object PrivacyPolicy : Screen("privacy_policy")
     object History    : Screen("history")
@@ -29,7 +30,7 @@ sealed class Screen(val route: String) {
     object MediaStoreFinder : Screen("media_store_finder")
 }
 
-// --- Type-safe route definitions (Kotlin Serialization) ---
+// Type-safe route definitions (Kotlin Serialization)
 // Phase 3 demonstration: SearchResultsRoute uses @Serializable for compile-time
 // safety and automatic argument encoding - no manual URL encoding required.
 //

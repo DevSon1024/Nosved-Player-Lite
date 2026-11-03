@@ -379,6 +379,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private var wasPlayingBeforeSeek = false
+    private var lastSmoothSeekMs = 0L
 
     fun beginSeek() {
         val player = playerManager?.exoPlayer ?: return
@@ -386,6 +387,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
             _isSeeking.value = true
             wasPlayingBeforeSeek = player.isPlaying
             _seekPreviewPosition.value = (playerManager?.currentPosition?.value ?: player.currentPosition).coerceAtLeast(0L)
+            playerManager?.setScrubbingMode(true)
             playerManager?.pause()
         }
     }
@@ -395,12 +397,20 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
             beginSeek()
         }
         val duration = (playerManager?.duration?.value ?: playerManager?.exoPlayer?.duration ?: 0L).coerceAtLeast(0L)
-        _seekPreviewPosition.value = positionMs.coerceIn(0L, if (duration > 0L) duration else Long.MAX_VALUE)
+        val target = positionMs.coerceIn(0L, if (duration > 0L) duration else Long.MAX_VALUE)
+        _seekPreviewPosition.value = target
+
+        val now = System.currentTimeMillis()
+        if (now - lastSmoothSeekMs >= 60L) {
+            lastSmoothSeekMs = now
+            playerManager?.seekSmooth(target)
+        }
     }
 
     fun commitSeek() {
         val target = _seekPreviewPosition.value
         _isSeeking.value = false
+        playerManager?.setScrubbingMode(false)
         playerManager?.seekTo(target)
         if (wasPlayingBeforeSeek && _currentVideo.value != null) {
             playerManager?.resume()

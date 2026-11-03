@@ -18,6 +18,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
 import com.devson.nvplayerlite.model.Video
 import com.devson.nvplayerlite.ui.screens.settings.AboutScreen
+import com.devson.nvplayerlite.ui.screens.settings.CreditScreen
 import com.devson.nvplayerlite.ui.screens.HistoryScreen
 import com.devson.nvplayerlite.ui.screens.HomeScreen
 import com.devson.nvplayerlite.ui.screens.OnboardingScreen
@@ -87,7 +88,7 @@ fun NavGraph(
             )
         }
     ) {
-        //  Onboarding (first-launch only) 
+        // Onboarding (first-launch only)
         composable(Screen.Onboarding.route) {
             OnboardingScreen(
                 onFinished = {
@@ -207,7 +208,14 @@ fun NavGraph(
         composable(Screen.About.route) {
             AboutScreen(
                 onBack                = { safePopBackStack() },
-                onEnableDeveloperMode = { settingsViewModel.enableDeveloperMode() }
+                onEnableDeveloperMode = { settingsViewModel.enableDeveloperMode() },
+                onNavigateToCredits   = { navController.navigate(Screen.Credits.route) }
+            )
+        }
+
+        composable(Screen.Credits.route) {
+            CreditScreen(
+                onBack = { safePopBackStack() }
             )
         }
 

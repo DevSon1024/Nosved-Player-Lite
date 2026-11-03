@@ -43,6 +43,7 @@ data class PlaybackSettings(
     val softButtonMode: SoftButtonMode = SoftButtonMode.AUTO_HIDE,
     val showElapsedTimeOverlay: Boolean = false,
     val showBatteryClockOverlay: Boolean = false,
+    val showStatsOverlay: Boolean = false,
     val showScreenRotationButton: Boolean = true,
     val pauseWhenObstructed: Boolean = true,
     val showRemainingTime: Boolean = false,
@@ -118,6 +119,7 @@ class PlaybackSettingsRepository(private val context: Context) {
         val CUSTOM_BRIGHTNESS_LEVEL = floatPreferencesKey("custom_brightness_level")
         val SHOW_ELAPSED_TIME_OVERLAY = booleanPreferencesKey("show_elapsed_time_overlay")
         val SHOW_BATTERY_CLOCK_OVERLAY = booleanPreferencesKey("show_battery_clock_overlay")
+        val SHOW_STATS_OVERLAY = booleanPreferencesKey("show_stats_overlay")
         val SHOW_SCREEN_ROTATION_BUTTON = booleanPreferencesKey("show_screen_rotation_button")
         val PAUSE_WHEN_OBSTRUCTED = booleanPreferencesKey("pause_when_obstructed")
         val SHOW_REMAINING_TIME = booleanPreferencesKey("show_remaining_time")
@@ -185,6 +187,7 @@ class PlaybackSettingsRepository(private val context: Context) {
                 softButtonMode = try { SoftButtonMode.valueOf(preferences[PreferencesKeys.SOFT_BUTTON_MODE] ?: SoftButtonMode.AUTO_HIDE.name) } catch (e: Exception) { SoftButtonMode.AUTO_HIDE },
                 showElapsedTimeOverlay = preferences[PreferencesKeys.SHOW_ELAPSED_TIME_OVERLAY] ?: false,
                 showBatteryClockOverlay = preferences[PreferencesKeys.SHOW_BATTERY_CLOCK_OVERLAY] ?: false,
+                showStatsOverlay = preferences[PreferencesKeys.SHOW_STATS_OVERLAY] ?: false,
                 showScreenRotationButton = preferences[PreferencesKeys.SHOW_SCREEN_ROTATION_BUTTON] ?: true,
                 pauseWhenObstructed = preferences[PreferencesKeys.PAUSE_WHEN_OBSTRUCTED] ?: true,
                 showRemainingTime = preferences[PreferencesKeys.SHOW_REMAINING_TIME] ?: false,
@@ -389,6 +392,10 @@ class PlaybackSettingsRepository(private val context: Context) {
 
     suspend fun updateShowBatteryClockOverlay(show: Boolean) {
         context.dataStore.edit { it[PreferencesKeys.SHOW_BATTERY_CLOCK_OVERLAY] = show }
+    }
+
+    suspend fun updateShowStatsOverlay(show: Boolean) {
+        context.dataStore.edit { it[PreferencesKeys.SHOW_STATS_OVERLAY] = show }
     }
 
     suspend fun updateShowScreenRotationButton(show: Boolean) {

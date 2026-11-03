@@ -10,23 +10,30 @@ import android.view.WindowManager
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -36,6 +43,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
@@ -45,6 +53,7 @@ import androidx.compose.ui.unit.sp
 import androidx.media3.common.C
 import androidx.media3.common.Format
 import androidx.media3.common.Player
+import com.devson.nosvedmedia.NosvedMedia
 import kotlinx.coroutines.delay
 import java.io.BufferedReader
 import java.io.FileReader
@@ -63,15 +72,28 @@ data class PlaybackStats(
     val videoResolution: String = "N/A",
     val videoCodec: String = "N/A",
     val videoBitrate: String = "N/A",
+    val videoTracksCount: Int = 0,
     val audioCodec: String = "N/A",
     val audioSampleRate: String = "N/A",
     val audioChannels: String = "N/A",
-    val bufferHealth: String = "0 / 0 ms",
-    val playbackSpeed: String = "1.0x",
+    val audioLanguage: String = "N/A",
+    val audioTracksCount: Int = 0,
+    val audioAllLanguages: String = "N/A",
+    val subtitleCodec: String = "None",
+    val subtitleLanguage: String = "None",
+    val subtitleTracksCount: Int = 0,
+    val subtitleAllLanguages: String = "N/A",
+    val bufferHealth: String = "0 / 0 s",
+    val playbackSpeed: String = "1.00x",
     val displayRefreshRate: String = "N/A",
     val screenResolution: String = "N/A",
     val reportedFps: Float = 0f,
-    val formatFps: Float = 0f
+    val formatFps: Float = 0f,
+    val nosvedVersion: String = "1.0.0",
+    val ffmpegVersion: String = "7.1",
+    val dav1dVersion: String = "1.5.0",
+    val isNosvedInitialized: Boolean = false,
+    val isCodecSupportedByNosved: Boolean = false
 )
 
 @Composable
@@ -105,18 +127,20 @@ fun DeviceStatsOverlay(
     ) {
         Card(
             modifier = Modifier
-                .widthIn(min = 280.dp, max = 340.dp)
-                .padding(16.dp),
-            shape = RoundedCornerShape(16.dp),
+                .widthIn(min = 300.dp, max = 360.dp)
+                .heightIn(max = 500.dp)
+                .padding(8.dp),
+            shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
-            )
+                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
         ) {
             Column(
                 modifier = Modifier
                     .padding(16.dp)
                     .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 // Header with Close
                 Row(
@@ -124,37 +148,47 @@ fun DeviceStatsOverlay(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = "STATS FOR NERDS",
-                        color = MaterialTheme.colorScheme.onSurface,
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    IconButton(onClick = onDismiss, modifier = Modifier.padding(0.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.primaryContainer),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Analytics,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                        Text(
+                            text = "STATS & DIAGNOSTICS",
+                            color = MaterialTheme.colorScheme.onSurface,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = "Close Stats",
-                            tint = MaterialTheme.colorScheme.onSurface
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(18.dp)
                         )
                     }
                 }
 
-                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f))
+                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f))
 
-                // Video Details
-                StatsSectionHeader("VIDEO")
+                // Video Section
+                StatsSectionHeader("VIDEO & DECODER")
                 StatItem("Resolution", playbackStats.videoResolution)
-                StatItem("Codec", playbackStats.videoCodec)
-                
-                val decoderLabel = when {
-                    videoDecoderName == null -> "-"
-                    videoDecoderName.contains("c2.android", ignoreCase = true) -> "[SW] $videoDecoderName"
-                    videoDecoderName.contains("omx.google", ignoreCase = true) -> "[SW] $videoDecoderName"
-                    videoDecoderName.contains("ffmpeg", ignoreCase = true) -> "[SW] $videoDecoderName"
-                    else -> "[HW] $videoDecoderName"
-                }
-                StatItem("Decoder", decoderLabel, if (decoderLabel.contains("[SW]")) Color(0xFFFF9800) else Color(0xFF4CAF50))
-                
+
                 val fpsToDisplay = if (playbackStats.reportedFps > 0f) {
                     "%.2f fps".format(playbackStats.reportedFps)
                 } else if (playbackStats.formatFps > 0f) {
@@ -162,40 +196,65 @@ fun DeviceStatsOverlay(
                 } else {
                     "N/A"
                 }
-                StatItem("Framerate", fpsToDisplay)
-                StatItem("Bitrate", playbackStats.videoBitrate)
+                StatItem("Framerate (FPS)", fpsToDisplay, Color(0xFF64B5F6))
+                StatItem("Video Bitrate", playbackStats.videoBitrate)
+                StatItem("Video Codec", playbackStats.videoCodec)
 
-                // Audio Details
-                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f))
-                StatsSectionHeader("AUDIO")
-                StatItem("Codec", playbackStats.audioCodec)
-                StatItem("Sample Rate", playbackStats.audioSampleRate)
-                StatItem("Channels", playbackStats.audioChannels)
+                val decoderLabel = when {
+                    videoDecoderName == null -> "-"
+                    videoDecoderName.contains("c2.android", ignoreCase = true) -> "[SW] $videoDecoderName"
+                    videoDecoderName.contains("omx.google", ignoreCase = true) -> "[SW] $videoDecoderName"
+                    videoDecoderName.contains("ffmpeg", ignoreCase = true) -> "[SW] NosvedMedia FFmpeg"
+                    videoDecoderName.contains("dav1d", ignoreCase = true) -> "[SW] NosvedMedia dav1d"
+                    else -> "[HW] $videoDecoderName"
+                }
+                val isSwDecoder = decoderLabel.contains("[SW]")
+                StatItem("Active Decoder", decoderLabel, if (isSwDecoder) Color(0xFFFFB74D) else Color(0xFF81C784))
 
-                // Playback Health
-                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f))
-                StatsSectionHeader("PLAYBACK")
+                val nosvedSupportStatus = if (playbackStats.isCodecSupportedByNosved) {
+                    "Supported (SW fallback ready)"
+                } else {
+                    "Hardware standard"
+                }
+                StatItem("NosvedMedia Support", nosvedSupportStatus, if (playbackStats.isCodecSupportedByNosved) Color(0xFF81C784) else MaterialTheme.colorScheme.onSurfaceVariant)
+
+                // NosvedMedia Engine Section
+                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f))
+                StatsSectionHeader("NOSVEDMEDIA CORE")
+                StatItem("Library Version", "v${playbackStats.nosvedVersion} (Active)")
+                StatItem("FFmpeg Core", "v${playbackStats.ffmpegVersion}")
+                StatItem("dav1d Core (AV1)", "v${playbackStats.dav1dVersion}")
+
+                // Tracks Information Section
+                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f))
+                StatsSectionHeader("MEDIA TRACKS")
+                StatItem("Video Tracks", "${playbackStats.videoTracksCount} track(s)")
+                StatItem("Active Audio", "${playbackStats.audioLanguage} • ${playbackStats.audioCodec}")
+                StatItem("Audio Channels", "${playbackStats.audioChannels} @ ${playbackStats.audioSampleRate}")
+                StatItem("Audio Tracks", "${playbackStats.audioTracksCount} track(s) [${playbackStats.audioAllLanguages}]")
+                StatItem("Active Subtitle", "${playbackStats.subtitleLanguage} • ${playbackStats.subtitleCodec}")
+                StatItem("Subtitle Tracks", "${playbackStats.subtitleTracksCount} track(s) [${playbackStats.subtitleAllLanguages}]")
+
+                // Playback & Display
+                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f))
+                StatsSectionHeader("PLAYBACK & DISPLAY")
                 StatItem("Buffer (Buf/Cur)", playbackStats.bufferHealth)
-                StatItem("Speed", playbackStats.playbackSpeed)
+                StatItem("Playback Speed", playbackStats.playbackSpeed)
+                StatItem("Display Refresh", playbackStats.displayRefreshRate)
+                StatItem("Display Resolution", playbackStats.screenResolution)
 
-                // Device Display
-                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f))
-                StatsSectionHeader("DISPLAY")
-                StatItem("Refresh Rate", playbackStats.displayRefreshRate)
-                StatItem("Resolution", playbackStats.screenResolution)
-
-                // System Specs
-                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f))
-                StatsSectionHeader("SYSTEM")
-                StatItem("CPU", "${deviceStats.cpuPercent}%", levelColor(deviceStats.cpuPercent.toFloat() / 100f))
-                StatItem("Memory", "${deviceStats.usedMemMb} / ${deviceStats.totalMemMb} MB", Color.Cyan.copy(alpha = 0.85f))
+                // System Resources
+                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f))
+                StatsSectionHeader("SYSTEM HEALTH")
+                StatItem("CPU Usage", "${deviceStats.cpuPercent}%", levelColor(deviceStats.cpuPercent.toFloat() / 100f))
+                StatItem("Memory (RAM)", "${deviceStats.usedMemMb} / ${deviceStats.totalMemMb} MB", Color.Cyan.copy(alpha = 0.85f))
                 StatItem(
                     "Battery",
                     "${deviceStats.batteryPercent}% ${if (deviceStats.batteryCharging) "⚡" else ""}",
                     batteryColor(deviceStats.batteryPercent)
                 )
                 StatItem(
-                    "Temp",
+                    "Temperature",
                     if (deviceStats.tempCelsius > 0f) "%.1f°C".format(deviceStats.tempCelsius) else "N/A",
                     tempColor(deviceStats.tempCelsius)
                 )
@@ -209,7 +268,7 @@ private fun StatsSectionHeader(title: String) {
     Text(
         text = title,
         color = MaterialTheme.colorScheme.primary,
-        style = MaterialTheme.typography.labelMedium,
+        style = MaterialTheme.typography.labelSmall,
         fontWeight = FontWeight.Bold,
         letterSpacing = 1.0.sp
     )
@@ -218,7 +277,7 @@ private fun StatsSectionHeader(title: String) {
 @Composable
 private fun StatItem(label: String, value: String, valueColor: Color = MaterialTheme.colorScheme.onSurface) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 1.5.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -244,16 +303,26 @@ private fun collectPlaybackStats(player: Player?, context: Context, reportedFps:
     var vRes = "N/A"
     var vCodec = "N/A"
     var vBitrate = "N/A"
+    var formatFps = 0f
+    var videoCount = 0
+
     var aCodec = "N/A"
     var aSampleRate = "N/A"
     var aChannels = "N/A"
-    var formatFps = 0f
+    var aLanguage = "N/A"
+    var audioCount = 0
+    val audioLangs = mutableListOf<String>()
+
+    var sCodec = "None"
+    var sLanguage = "None"
+    var subCount = 0
+    val subLangs = mutableListOf<String>()
 
     val groups = player?.currentTracks?.groups ?: emptyList()
     for (group in groups) {
-        if (group.isSelected) {
-            if (group.type == C.TRACK_TYPE_VIDEO) {
-                // Get the first selected track format
+        when (group.type) {
+            C.TRACK_TYPE_VIDEO -> {
+                videoCount += group.length
                 for (i in 0 until group.length) {
                     if (group.isTrackSelected(i)) {
                         val format = group.getTrackFormat(i)
@@ -266,12 +335,17 @@ private fun collectPlaybackStats(player: Player?, context: Context, reportedFps:
                         break
                     }
                 }
-            } else if (group.type == C.TRACK_TYPE_AUDIO) {
+            }
+            C.TRACK_TYPE_AUDIO -> {
+                audioCount += group.length
                 for (i in 0 until group.length) {
+                    val format = group.getTrackFormat(i)
+                    val lang = format.language?.takeIf { it.isNotBlank() } ?: "und"
+                    if (!audioLangs.contains(lang)) audioLangs.add(lang)
                     if (group.isTrackSelected(i)) {
-                        val format = group.getTrackFormat(i)
                         aCodec = format.sampleMimeType ?: "N/A"
                         aSampleRate = if (format.sampleRate != Format.NO_VALUE) "${format.sampleRate} Hz" else "N/A"
+                        aLanguage = format.language ?: "Default"
                         aChannels = when (format.channelCount) {
                             1 -> "Mono (1)"
                             2 -> "Stereo (2)"
@@ -280,7 +354,18 @@ private fun collectPlaybackStats(player: Player?, context: Context, reportedFps:
                             Format.NO_VALUE -> "N/A"
                             else -> "${format.channelCount} ch"
                         }
-                        break
+                    }
+                }
+            }
+            C.TRACK_TYPE_TEXT -> {
+                subCount += group.length
+                for (i in 0 until group.length) {
+                    val format = group.getTrackFormat(i)
+                    val lang = format.language?.takeIf { it.isNotBlank() } ?: "und"
+                    if (!subLangs.contains(lang)) subLangs.add(lang)
+                    if (group.isTrackSelected(i)) {
+                        sCodec = format.sampleMimeType ?: "Text"
+                        sLanguage = format.language ?: format.label ?: "Selected"
                     }
                 }
             }
@@ -291,7 +376,7 @@ private fun collectPlaybackStats(player: Player?, context: Context, reportedFps:
     val currentPos = player?.currentPosition ?: 0L
     val bufferHealth = "%.1f / %.1f s".format(bufferPos / 1000f, currentPos / 1000f)
     val speed = player?.playbackParameters?.speed ?: 1f
-    
+
     val display = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
         context.display
     } else {
@@ -299,29 +384,48 @@ private fun collectPlaybackStats(player: Player?, context: Context, reportedFps:
         (context.getSystemService(Context.WINDOW_SERVICE) as WindowManager).defaultDisplay
     }
     val refreshRate = display?.refreshRate ?: 0f
-
     val screenRes = context.resources.displayMetrics.run { "${widthPixels}x${heightPixels}" }
+
+    val isNosvedInit = try { NosvedMedia.isInitialized() } catch (_: Throwable) { false }
+    val ffmpegVer = try { NosvedMedia.getFFmpegVersion() } catch (_: Throwable) { "7.1" }
+    val dav1dVer = try { NosvedMedia.getDav1dVersion() } catch (_: Throwable) { "1.5.0" }
+    val isSupported = try {
+        if (vCodec != "N/A") NosvedMedia.isCodecSupported(vCodec) else false
+    } catch (_: Throwable) { false }
 
     return PlaybackStats(
         videoResolution = vRes,
         videoCodec = vCodec,
         videoBitrate = vBitrate,
+        videoTracksCount = videoCount,
         audioCodec = aCodec,
         audioSampleRate = aSampleRate,
         audioChannels = aChannels,
+        audioLanguage = aLanguage,
+        audioTracksCount = audioCount,
+        audioAllLanguages = if (audioLangs.isEmpty()) "None" else audioLangs.joinToString(", "),
+        subtitleCodec = sCodec,
+        subtitleLanguage = sLanguage,
+        subtitleTracksCount = subCount,
+        subtitleAllLanguages = if (subLangs.isEmpty()) "None" else subLangs.joinToString(", "),
         bufferHealth = bufferHealth,
         playbackSpeed = "%.2fx".format(speed),
         displayRefreshRate = if (refreshRate > 0f) "%.1f Hz".format(refreshRate) else "N/A",
         screenResolution = screenRes,
         reportedFps = reportedFps,
-        formatFps = formatFps
+        formatFps = formatFps,
+        nosvedVersion = "1.0.0",
+        ffmpegVersion = ffmpegVer,
+        dav1dVersion = dav1dVer,
+        isNosvedInitialized = isNosvedInit,
+        isCodecSupportedByNosved = isSupported
     )
 }
 
 private fun levelColor(level: Float): Color = when {
-    level < 0.5f -> Color(0xFF4CAF50)   // green
-    level < 0.75f -> Color(0xFFFF9800)  // orange
-    else -> Color(0xFFF44336)           // red
+    level < 0.5f -> Color(0xFF4CAF50)
+    level < 0.75f -> Color(0xFFFF9800)
+    else -> Color(0xFFF44336)
 }
 
 private fun tempColor(temp: Float): Color = when {
@@ -338,10 +442,8 @@ private fun batteryColor(percent: Int): Color = when {
 }
 
 private fun collectStats(context: Context, videoFps: Float): DeviceStats {
-    // CPU
     val cpu = readCpuUsage()
 
-    // Memory
     val am = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
     val memInfo = ActivityManager.MemoryInfo()
     am.getMemoryInfo(memInfo)
@@ -349,7 +451,6 @@ private fun collectStats(context: Context, videoFps: Float): DeviceStats {
     val availMb = memInfo.availMem / 1_048_576L
     val usedMb = totalMb - availMb
 
-    // Battery
     val batteryIntent = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
     val level = batteryIntent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
     val scale = batteryIntent?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
@@ -357,7 +458,6 @@ private fun collectStats(context: Context, videoFps: Float): DeviceStats {
     val plugged = batteryIntent?.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1) ?: 0
     val charging = plugged != 0
 
-    // Temperature (from battery broadcast - most reliable cross-device)
     val rawTemp = batteryIntent?.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, 0) ?: 0
     val tempC = rawTemp / 10f
 
@@ -372,7 +472,6 @@ private fun collectStats(context: Context, videoFps: Float): DeviceStats {
     )
 }
 
-/** Reads /proc/stat twice 100ms apart for a real CPU usage percentage. */
 private fun readCpuUsage(): Int {
     return try {
         fun readStat(): LongArray {

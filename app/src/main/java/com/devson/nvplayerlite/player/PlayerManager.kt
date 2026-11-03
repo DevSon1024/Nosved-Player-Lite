@@ -17,7 +17,8 @@ import androidx.media3.common.MediaItem.SubtitleConfiguration
 import android.net.Uri
 import androidx.media3.common.util.UnstableApi
 import androidx.annotation.OptIn
-import io.github.anilbeesetti.nextlib.media3ext.ffdecoder.NextRenderersFactory
+import com.devson.nosvedmedia.NosvedMedia
+import com.devson.nosvedmedia.media3.FFmpegRenderersFactory
 import androidx.media3.exoplayer.upstream.Loader
 import android.media.audiofx.LoudnessEnhancer
 import com.devson.nvplayerlite.util.AppLogger
@@ -35,7 +36,7 @@ import android.os.Handler
 import androidx.media3.common.MimeTypes
 
 @OptIn(UnstableApi::class)
-class HDRFallbackRenderersFactory(context: Context) : NextRenderersFactory(context) {
+class HDRFallbackRenderersFactory(context: Context) : FFmpegRenderersFactory(context) {
     override fun buildVideoRenderers(
         context: Context,
         extensionRendererMode: Int,
@@ -150,6 +151,7 @@ class PlayerManager(private val context: Context) {
         defaultSubtitleLang: String = ""
     ) {
         if (exoPlayer == null) {
+            NosvedMedia.initialize(context)
             val extensionMode = when (decoderMode) {
                 DecoderMode.HW      -> androidx.media3.exoplayer.DefaultRenderersFactory.EXTENSION_RENDERER_MODE_OFF
                 DecoderMode.HW_PLUS -> androidx.media3.exoplayer.DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON

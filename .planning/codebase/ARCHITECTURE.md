@@ -33,7 +33,7 @@ The application follows the decoupled MVVM pattern, separating UI logic from bus
 ## Playback Engine
 
 - **PlayerManager**: A dedicated manager class that encapsulates `ExoPlayer` (Media3).
-- **Renderer Factory**: Uses `NextRenderersFactory` from `nextlib` for enhanced codec support (e.g., FFmpeg).
+- **Renderer Factory**: Uses `HDRFallbackRenderersFactory` powered by `NosvedMedia` (FFmpeg 7.1 + dav1d 1.5.0) for native fallback software decoding.
 - **Audio Boost**: Implements `LoudnessEnhancer` for audio amplification beyond system limits.
 
 ## Data Flow

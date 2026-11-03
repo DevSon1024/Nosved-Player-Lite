@@ -34,13 +34,22 @@ abstract class NosvedDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_3_2 = object : Migration(3, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("DROP TABLE IF EXISTS hidden_videos")
+            }
+        }
+
         fun getInstance(context: Context): NosvedDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     NosvedDatabase::class.java,
                     "nosved_db"
-                ).addMigrations(MIGRATION_1_2).build()
+                )
+                    .addMigrations(MIGRATION_1_2, MIGRATION_3_2)
+                    .fallbackToDestructiveMigrationOnDowngrade(false)
+                    .build()
                 INSTANCE = instance
                 instance
             }

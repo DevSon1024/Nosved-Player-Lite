@@ -246,6 +246,14 @@ fun PlayerScreen(
                         checked = playbackSettings.showBatteryClockOverlay,
                         onCheckedChange = { settingsViewModel.updateShowBatteryClockOverlay(it) }
                     )
+                    SettingsDivider()
+                    SettingsToggleRow(
+                        icon = Icons.Default.Info,
+                        title = "Show Statistics Overlay",
+                        subtitle = "Display real-time FPS, codecs, NosvedMedia info, decoders, and audio/video/subtitle track details",
+                        checked = playbackSettings.showStatsOverlay,
+                        onCheckedChange = { settingsViewModel.updateShowStatsOverlay(it) }
+                    )
                 }
                 Spacer(Modifier.height(16.dp))
             }

@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Context
 import android.content.pm.ActivityInfo
 import android.media.AudioManager
+import android.net.Uri
 import android.os.Build
 import android.view.WindowManager
 import android.widget.Toast
@@ -108,6 +109,7 @@ fun VideoScreen(
 
     val controlsVisible by viewModel.controlsVisible.collectAsState()
     val currentVideo by viewModel.currentVideo.collectAsState()
+    val videoUri = remember(currentVideo?.uri) { currentVideo?.uri?.let { Uri.parse(it) } }
     val isPortrait by viewModel.isPortraitVideo?.collectAsState(initial = null)
         ?: remember { mutableStateOf<Boolean?>(null) }
 
@@ -601,11 +603,14 @@ fun VideoScreen(
 
         //  Device stats overlay 
         DeviceStatsOverlay(
-            visible = showStats,
+            visible = showStats || playbackSettings.showStatsOverlay,
             player = player,
             videoFps = videoFps,
             videoDecoderName = videoDecoderName,
-            onDismiss = { viewModel.setShowStats(false) },
+            onDismiss = {
+                viewModel.setShowStats(false)
+                settingsViewModel.updateShowStatsOverlay(false)
+            },
             modifier = Modifier
                 .align(Alignment.TopStart)
                 .padding(top = 16.dp, start = 16.dp)
@@ -671,6 +676,7 @@ fun VideoScreen(
                     bufferedPosition = bufferedPosition,
                     bufferedPositionProvider = { bufferedPosition },
                     duration = duration,
+                    videoUri = videoUri,
                     onPlayPauseToggle = {
                         viewModel.togglePlayPause()
                         viewModel.showControlsAndDelayHide()
@@ -788,6 +794,7 @@ fun VideoScreen(
                 title = currentVideo?.title ?: "",
                 currentPosition = displayedPosition,
                 duration = duration,
+                videoUri = videoUri,
                 showStats = showStats,
                 hasPrevious = hasPrevious,
                 hasNext = hasNext,

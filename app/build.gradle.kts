@@ -146,7 +146,9 @@ android {
                 "**/libavutil.so",
                 "**/libswresample.so",
                 "**/libswscale.so",
-                "**/libpostproc.so"
+                "**/libpostproc.so",
+                "**/libdav1d.so",
+                "**/libnative_codecs.so"
             )
         }
     }
@@ -179,16 +181,10 @@ dependencies {
     implementation(libs.androidx.media3.extractor)
     // Inspector for non-playback media inspection / metadata extraction
     implementation(libs.androidx.media3.inspector)
-    // Optional software-decoder extensions - uncomment to activate (increases APK size)
-    // implementation(libs.androidx.media3.decoder.av1)
-    // implementation(libs.androidx.media3.decoder.opus)
-    // implementation(libs.androidx.media3.decoder.vp9)
-    // implementation(libs.androidx.media3.decoder.flac)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
 
-    // Nextlib: Media3 ExoPlayer extensions with native decoders for broad format playback
-    implementation(libs.nextlib.media3ext)
-    implementation(libs.nextlib.mediainfo)
+    // NosvedMedia: Media3 software video decoder integration (FFmpeg + dav1d)
+    implementation("com.devson.nosvedmedia:nosved-media3:1.0.0")
     
     // DataStore for Settings
     implementation("androidx.datastore:datastore-preferences:1.0.0")
