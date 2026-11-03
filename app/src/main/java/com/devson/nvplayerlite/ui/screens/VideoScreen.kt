@@ -100,26 +100,11 @@ fun VideoScreen(
     // --- derivedStateOf: prevents whole-screen recomposition on rapid playback updates ---
     // Only composables that READ these values recompose when they change, not VideoScreen
     // as a whole. This is the primary fix for timeline-scrub jitter.
-    val rawCurrentPosition by viewModel.currentPosition?.collectAsState(initial = 0L)
-        ?: remember { mutableStateOf(0L) }
-    val currentPosition by remember { derivedStateOf { rawCurrentPosition } }
-
-    val rawDuration by viewModel.duration?.collectAsState(initial = 0L)
-        ?: remember { mutableStateOf(0L) }
-    val duration by remember { derivedStateOf { rawDuration } }
-
-    val rawBufferedPosition by viewModel.bufferedPosition?.collectAsState(initial = 0L)
-        ?: remember { mutableStateOf(0L) }
-    @Suppress("unused")
-    val bufferedPosition by remember { derivedStateOf { rawBufferedPosition } }
-
-    val rawVideoFps by viewModel.videoFps?.collectAsState(initial = 0f)
-        ?: remember { mutableStateOf(0f) }
-    val videoFps by remember { derivedStateOf { rawVideoFps } }
-
-    val rawVideoDecoderName by viewModel.videoDecoderName?.collectAsState(initial = null)
-        ?: remember { mutableStateOf<String?>(null) }
-    val videoDecoderName by remember { derivedStateOf { rawVideoDecoderName } }
+    val currentPosition by (viewModel.currentPosition ?: kotlinx.coroutines.flow.flowOf(0L)).collectAsState(initial = 0L)
+    val duration by (viewModel.duration ?: kotlinx.coroutines.flow.flowOf(0L)).collectAsState(initial = 0L)
+    val bufferedPosition by (viewModel.bufferedPosition ?: kotlinx.coroutines.flow.flowOf(0L)).collectAsState(initial = 0L)
+    val videoFps by (viewModel.videoFps ?: kotlinx.coroutines.flow.flowOf(0f)).collectAsState(initial = 0f)
+    val videoDecoderName by (viewModel.videoDecoderName ?: kotlinx.coroutines.flow.flowOf(null)).collectAsState(initial = null)
 
     val controlsVisible by viewModel.controlsVisible.collectAsState()
     val currentVideo by viewModel.currentVideo.collectAsState()
@@ -682,15 +667,19 @@ fun VideoScreen(
                     title = currentVideo?.title ?: "",
                     isPlaying = playingIntent,
                     currentPosition = displayedPosition,
+                    currentPositionProvider = { displayedPosition },
+                    bufferedPosition = bufferedPosition,
+                    bufferedPositionProvider = { bufferedPosition },
                     duration = duration,
                     onPlayPauseToggle = {
                         viewModel.togglePlayPause()
                         viewModel.showControlsAndDelayHide()
                     },
                     onSeek = { targetPos, isFinished ->
-                        viewModel.updateSeekPreview(targetPos)
                         if (isFinished) {
                             viewModel.commitSeek()
+                        } else {
+                            viewModel.updateSeekPreview(targetPos)
                         }
                         viewModel.showControlsAndDelayHide()
                     },
@@ -900,7 +889,10 @@ fun VideoScreen(
         visible = showAudioSettingsSideSheet,
         audioTracks = audioTracks,
         audioBoosterEnabled = isAudioBoostEnabled,
-        onToggleAudioBooster = { viewModel.toggleAudioBoost(it) },
+        onToggleAudioBooster = {
+            viewModel.toggleAudioBoost(it)
+            settingsViewModel.updateAudioBoosterEnabled(it)
+        },
         onSelectAudioTrack = { viewModel.selectAudioTrack(it) },
         onDismiss = { showAudioSettingsSideSheet = false }
     )
@@ -910,15 +902,33 @@ fun VideoScreen(
         playbackSettings = playbackSettings,
         subtitleTracks = subtitleTracks,
         onSelectSubtitleTrack = { viewModel.selectSubtitleTrack(it) },
-        onSetSubtitleDelay = { viewModel.setSubtitleDelayMs(it) },
+        onSetSubtitleDelay = {
+            viewModel.setSubtitleDelayMs(it)
+            settingsViewModel.updateSubtitleDelayMs(it)
+        },
         onUpdateSubtitleFont = { settingsViewModel.updateSubtitleFont(it) },
         onUpdateIsSubtitleBold = { settingsViewModel.updateIsSubtitleBold(it) },
         onUpdateForceAssSubtitleOverride = { settingsViewModel.updateForceAssSubtitleOverride(it) },
-        onUpdateSubtitleTextSizeScale = { viewModel.updateSubtitleTextSizeScale(it) },
-        onUpdateSubtitleBgStyle = { viewModel.updateSubtitleBgStyle(it) },
-        onUpdateSubtitleDelay = { viewModel.setSubtitleDelayMs(it) },
-        onUpdateSubtitleVerticalOffset = { viewModel.setSubtitleVerticalOffset(it) },
-        onUpdateSubtitleGesturesEnabled = { isSubtitleGestureEnabled = it },
+        onUpdateSubtitleTextSizeScale = {
+            viewModel.updateSubtitleTextSizeScale(it)
+            settingsViewModel.updateSubtitleTextSizeScale(it)
+        },
+        onUpdateSubtitleBgStyle = {
+            viewModel.updateSubtitleBgStyle(it)
+            settingsViewModel.updateSubtitleBgStyle(it)
+        },
+        onUpdateSubtitleDelay = {
+            viewModel.setSubtitleDelayMs(it)
+            settingsViewModel.updateSubtitleDelayMs(it)
+        },
+        onUpdateSubtitleVerticalOffset = {
+            viewModel.setSubtitleVerticalOffset(it)
+            settingsViewModel.updateSubtitleVerticalOffset(it)
+        },
+        onUpdateSubtitleGesturesEnabled = {
+            isSubtitleGestureEnabled = it
+            settingsViewModel.updateSubtitleGesturesEnabled(it)
+        },
         onDismiss = { showSubtitleSettingsSideSheet = false },
         onImportSubtitleClick = { externalSubtitleLauncher.launch("*/*") }
     )

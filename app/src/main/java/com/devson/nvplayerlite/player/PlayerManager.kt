@@ -113,6 +113,8 @@ class PlayerManager(private val context: Context) {
     private val _videoFps = MutableStateFlow(0f)
     val videoFps: StateFlow<Float> = _videoFps.asStateFlow()
 
+    @Volatile private var isSeekingExoPlayer = false
+
     private val _videoDecoderName = MutableStateFlow<String?>(null)
     val videoDecoderName: StateFlow<String?> = _videoDecoderName.asStateFlow()
 
@@ -194,6 +196,16 @@ class PlayerManager(private val context: Context) {
                             }
                         }
 
+                        override fun onPositionDiscontinuity(
+                            oldPosition: Player.PositionInfo,
+                            newPosition: Player.PositionInfo,
+                            reason: Int
+                        ) {
+                            super.onPositionDiscontinuity(oldPosition, newPosition, reason)
+                            isSeekingExoPlayer = false
+                            _currentPosition.value = newPosition.positionMs.coerceAtLeast(0L)
+                        }
+
                         override fun onVideoSizeChanged(videoSize: VideoSize) {
                             if (videoSize.width > 0 && videoSize.height > 0) {
                                 _isPortraitVideo.value = videoSize.height > videoSize.width
@@ -212,6 +224,17 @@ class PlayerManager(private val context: Context) {
                             val audioGroupCount = tracks.groups.count { it.type == androidx.media3.common.C.TRACK_TYPE_AUDIO }
                             val subtitleGroupCount = tracks.groups.count { it.type == androidx.media3.common.C.TRACK_TYPE_TEXT }
 
+                            fun parseLanguageDisplay(lang: String?): String? {
+                                if (lang.isNullOrBlank() || lang == "und") return null
+                                return try {
+                                    val loc = java.util.Locale(lang)
+                                    val disp = loc.displayLanguage
+                                    if (disp.isNotBlank()) disp.replaceFirstChar { if (it.isLowerCase()) it.titlecase(loc) else it.toString() } else lang
+                                } catch (_: Exception) {
+                                    lang
+                                }
+                            }
+
                             for (group in tracks.groups) {
                                 if (group.type == androidx.media3.common.C.TRACK_TYPE_VIDEO && group.isSelected) {
                                     val format = group.getTrackFormat(0)
@@ -221,27 +244,49 @@ class PlayerManager(private val context: Context) {
                                 } else if (group.type == androidx.media3.common.C.TRACK_TYPE_AUDIO) {
                                     val format = group.getTrackFormat(0)
                                     val trackIndex = newAudioTracks.size
-                                    val langName = format.language?.let { java.util.Locale.forLanguageTag(it).displayLanguage }
-                                    val label = if (audioGroupCount == 1) {
-                                        langName ?: "Default"
-                                    } else {
-                                        "Track ${trackIndex + 1}" + (if (langName != null) " - $langName" else "")
-                                    }
-                                    newAudioTracks.add(TrackInfo(trackIndex, label, format.language))
+                                    val langName = parseLanguageDisplay(format.language)
+                                    val label = format.label?.takeIf { it.isNotBlank() }
+                                        ?: if (audioGroupCount == 1) {
+                                            langName ?: "Default Audio"
+                                        } else {
+                                            "Track ${trackIndex + 1}" + (if (langName != null) " ($langName)" else "")
+                                        }
+                                    newAudioTracks.add(
+                                        TrackInfo(
+                                            index = trackIndex,
+                                            label = label,
+                                            language = format.language,
+                                            selected = group.isSelected,
+                                            codec = format.sampleMimeType
+                                        )
+                                    )
                                     if (group.isSelected) currentAudioIdx = trackIndex
                                 } else if (group.type == androidx.media3.common.C.TRACK_TYPE_TEXT) {
                                     val format = group.getTrackFormat(0)
                                     val trackIndex = newSubtitleTracks.size
-                                    val langName = format.language?.let { java.util.Locale.forLanguageTag(it).displayLanguage }
-                                    val label = if (subtitleGroupCount == 1) {
-                                        langName ?: "Default"
-                                    } else {
-                                        "Track ${trackIndex + 1}" + (if (langName != null) " - $langName" else "")
-                                    }
-                                    newSubtitleTracks.add(TrackInfo(trackIndex, label, format.language))
+                                    val langName = parseLanguageDisplay(format.language)
+                                    val label = format.label?.takeIf { it.isNotBlank() }
+                                        ?: if (subtitleGroupCount == 1) {
+                                            langName ?: "Default Subtitle"
+                                        } else {
+                                            "Track ${trackIndex + 1}" + (if (langName != null) " ($langName)" else "")
+                                        }
+                                    newSubtitleTracks.add(
+                                        TrackInfo(
+                                            index = trackIndex,
+                                            label = label,
+                                            language = format.language,
+                                            selected = group.isSelected,
+                                            codec = format.sampleMimeType
+                                        )
+                                    )
                                     if (group.isSelected) currentSubIdx = trackIndex
                                 }
                             }
+
+                            // Prepend "None (Off)" for subtitles
+                            val isNoneSelected = (currentSubIdx == -1)
+                            newSubtitleTracks.add(0, TrackInfo(index = -1, label = "None (Off)", language = null, selected = isNoneSelected))
 
                             _audioTracks.value = newAudioTracks
                             _selectedAudioIndex.value = currentAudioIdx
@@ -479,32 +524,42 @@ class PlayerManager(private val context: Context) {
     }
 
     fun seekTo(positionMs: Long) {
-        exoPlayer?.seekTo(positionMs)
+        val player = exoPlayer ?: return
+        val duration = player.duration.coerceAtLeast(0L)
+        val target = positionMs.coerceIn(0L, duration)
+        isSeekingExoPlayer = true
+        player.seekTo(target)
+        _currentPosition.value = target
     }
 
     fun seekSmooth(positionMs: Long) {
         val player = exoPlayer ?: return
         val duration = player.duration.coerceAtLeast(0L)
-        player.seekTo(positionMs.coerceIn(0L, duration))
+        val target = positionMs.coerceIn(0L, duration)
+        isSeekingExoPlayer = true
+        player.seekTo(target)
+        _currentPosition.value = target
     }
 
     fun seekForward(ms: Long = 10000L) {
         val player = exoPlayer ?: return
-        val currentPos = player.currentPosition
+        val currentPos = _currentPosition.value
         val newPos = (currentPos + ms).coerceAtMost(player.duration.coerceAtLeast(0L))
-        player.seekTo(newPos)
+        seekTo(newPos)
     }
 
     fun seekBackward(ms: Long = 10000L) {
         val player = exoPlayer ?: return
-        val currentPos = player.currentPosition
+        val currentPos = _currentPosition.value
         val newPos = (currentPos - ms).coerceAtLeast(0L)
-        player.seekTo(newPos)
+        seekTo(newPos)
     }
 
     fun updateProgress() {
         val player = exoPlayer ?: return
-        _currentPosition.value = player.currentPosition.coerceAtLeast(0L)
+        if (!isSeekingExoPlayer) {
+            _currentPosition.value = player.currentPosition.coerceAtLeast(0L)
+        }
         _bufferedPosition.value = player.bufferedPosition.coerceAtLeast(0L)
         _duration.value = player.duration.coerceAtLeast(0L)
         
@@ -565,6 +620,8 @@ class PlayerManager(private val context: Context) {
                 .setOverrideForType(TrackSelectionOverride(trackGroup, 0))
                 .build()
         }
+        _selectedAudioIndex.value = index
+        _audioTracks.value = _audioTracks.value.map { it.copy(selected = it.id == index) }
     }
 
     fun selectSubtitleTrack(index: Int) {
@@ -575,6 +632,8 @@ class PlayerManager(private val context: Context) {
                 .buildUpon()
                 .setTrackTypeDisabled(androidx.media3.common.C.TRACK_TYPE_TEXT, true)
                 .build()
+            _selectedSubtitleIndex.value = -1
+            _subtitleTracks.value = _subtitleTracks.value.map { it.copy(selected = it.id == -1) }
             return
         }
 
@@ -601,6 +660,8 @@ class PlayerManager(private val context: Context) {
                 .setOverrideForType(TrackSelectionOverride(trackGroup, 0))
                 .build()
         }
+        _selectedSubtitleIndex.value = index
+        _subtitleTracks.value = _subtitleTracks.value.map { it.copy(selected = it.id == index) }
     }
 
     fun loadExternalSubtitle(uri: Uri, mimeType: String, encodingLabel: String = "UTF-8") {

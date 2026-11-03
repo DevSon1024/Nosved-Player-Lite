@@ -455,9 +455,11 @@ private fun StyleTab(
     onUpdateSubtitleTextSizeScale: (Float) -> Unit,
     onUpdateSubtitleBgStyle: (Int) -> Unit
 ) {
+    var localScale by remember(playbackSettings.subtitleTextSizeScale) { mutableFloatStateOf(playbackSettings.subtitleTextSizeScale) }
+
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         // Live Subtitle Preview Box
-        SubtitleLivePreviewCard(playbackSettings = playbackSettings)
+        SubtitleLivePreviewCard(playbackSettings = playbackSettings, textScale = localScale)
 
         // Text Size Scale Slider Card
         Surface(
@@ -496,7 +498,7 @@ private fun StyleTab(
                         shape = RoundedCornerShape(8.dp)
                     ) {
                         Text(
-                            text = "%.1fx".format(playbackSettings.subtitleTextSizeScale),
+                            text = "%.1fx".format(localScale),
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
@@ -515,16 +517,20 @@ private fun StyleTab(
                         icon = Icons.Rounded.Remove,
                         contentDescription = "Decrease size",
                         onStep = {
-                            val newScale = (playbackSettings.subtitleTextSizeScale - 0.1f)
+                            val newScale = (localScale - 0.1f)
                                 .coerceAtLeast(0.5f)
                                 .roundToTwoDecimals()
+                            localScale = newScale
                             onUpdateSubtitleTextSizeScale(newScale)
                         }
                     )
 
                     Slider(
-                        value = playbackSettings.subtitleTextSizeScale,
-                        onValueChange = { onUpdateSubtitleTextSizeScale(it.roundToTwoDecimals()) },
+                        value = localScale,
+                        onValueChange = {
+                            localScale = it
+                            onUpdateSubtitleTextSizeScale(it.roundToTwoDecimals())
+                        },
                         valueRange = 0.5f..3.0f,
                         modifier = Modifier.weight(1f)
                     )
@@ -533,9 +539,10 @@ private fun StyleTab(
                         icon = Icons.Rounded.Add,
                         contentDescription = "Increase size",
                         onStep = {
-                            val newScale = (playbackSettings.subtitleTextSizeScale + 0.1f)
+                            val newScale = (localScale + 0.1f)
                                 .coerceAtMost(3.0f)
                                 .roundToTwoDecimals()
+                            localScale = newScale
                             onUpdateSubtitleTextSizeScale(newScale)
                         }
                     )
@@ -658,7 +665,10 @@ private fun StyleTab(
 }
 
 @Composable
-private fun SubtitleLivePreviewCard(playbackSettings: PlaybackSettings) {
+private fun SubtitleLivePreviewCard(
+    playbackSettings: PlaybackSettings,
+    textScale: Float = playbackSettings.subtitleTextSizeScale
+) {
     val fontFamily = when (playbackSettings.subtitleFont) {
         SubtitleFont.DEFAULT -> FontFamily.Default
         SubtitleFont.MONOSPACE -> FontFamily.Monospace
@@ -694,7 +704,7 @@ private fun SubtitleLivePreviewCard(playbackSettings: PlaybackSettings) {
                     color = Color.White,
                     fontFamily = fontFamily,
                     fontWeight = if (playbackSettings.isSubtitleBold) FontWeight.Bold else FontWeight.Normal,
-                    fontSize = (14 * playbackSettings.subtitleTextSizeScale.coerceIn(0.7f, 1.8f)).sp,
+                    fontSize = (14 * textScale.coerceIn(0.7f, 1.8f)).sp,
                     textAlign = TextAlign.Center
                 )
             }
@@ -729,6 +739,8 @@ private fun SyncTab(
     onUpdateSubtitleVerticalOffset: (Float) -> Unit,
     onUpdateSubtitleGesturesEnabled: (Boolean) -> Unit
 ) {
+    var localOffset by remember(playbackSettings.subtitleVerticalOffset) { mutableFloatStateOf(playbackSettings.subtitleVerticalOffset) }
+
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         // Subtitle Delay Card
         Surface(
@@ -884,7 +896,7 @@ private fun SyncTab(
                         shape = RoundedCornerShape(8.dp)
                     ) {
                         Text(
-                            text = "${(playbackSettings.subtitleVerticalOffset * 100).roundToInt()}%",
+                            text = "${(localOffset * 100).roundToInt()}%",
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
@@ -902,16 +914,20 @@ private fun SyncTab(
                         icon = Icons.Rounded.Remove,
                         contentDescription = "Lower subtitles",
                         onStep = {
-                            val newOffset = (playbackSettings.subtitleVerticalOffset - 0.05f)
+                            val newOffset = (localOffset - 0.05f)
                                 .coerceAtLeast(0f)
                                 .roundToTwoDecimals()
+                            localOffset = newOffset
                             onUpdateSubtitleVerticalOffset(newOffset)
                         }
                     )
 
                     Slider(
-                        value = playbackSettings.subtitleVerticalOffset,
-                        onValueChange = { onUpdateSubtitleVerticalOffset(it.roundToTwoDecimals()) },
+                        value = localOffset,
+                        onValueChange = {
+                            localOffset = it
+                            onUpdateSubtitleVerticalOffset(it.roundToTwoDecimals())
+                        },
                         valueRange = 0f..0.85f,
                         modifier = Modifier.weight(1f)
                     )
@@ -920,9 +936,10 @@ private fun SyncTab(
                         icon = Icons.Rounded.Add,
                         contentDescription = "Raise subtitles",
                         onStep = {
-                            val newOffset = (playbackSettings.subtitleVerticalOffset + 0.05f)
+                            val newOffset = (localOffset + 0.05f)
                                 .coerceAtMost(0.85f)
                                 .roundToTwoDecimals()
+                            localOffset = newOffset
                             onUpdateSubtitleVerticalOffset(newOffset)
                         }
                     )

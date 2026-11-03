@@ -227,7 +227,8 @@ fun CapsulePlayerControls(
     var isRightExpanded by remember { mutableStateOf(false) }
 
     val themePrimary = MaterialTheme.colorScheme.primary
-    val posProvider: () -> Long = currentPositionProvider ?: { currentPosition }
+    val currentPosUpdated by rememberUpdatedState(currentPosition)
+    val posProvider: () -> Long = currentPositionProvider ?: { currentPosUpdated }
     val bufProvider: () -> Long = bufferedPositionProvider ?: { bufferedPosition }
     val safeDuration = duration.coerceAtLeast(1L).toFloat()
     var lastSeekTime by remember { mutableLongStateOf(0L) }
@@ -461,17 +462,10 @@ fun CapsulePlayerControls(
         }
 
         var scrubPosition by remember { mutableLongStateOf(-1L) }
-        var trackedPosition by remember { mutableLongStateOf(posProvider()) }
-        LaunchedEffect(Unit) {
-            while (true) {
-                trackedPosition = posProvider()
-                delay(200L)
-            }
-        }
         var isRemainingToggled by remember { mutableStateOf(false) }
         val effectiveShowRemaining = if (isRemainingToggled) !showRemainingTime else showRemainingTime
 
-        val displayPosition = if (isDragging && scrubPosition >= 0L) scrubPosition else trackedPosition
+        val displayPosition = if (scrubPosition >= 0L) scrubPosition else posProvider()
         val hasHours = duration >= 3600_000L
         val elapsedText = formatTime(displayPosition, forceHours = hasHours)
         val remainingMs = (duration - displayPosition).coerceAtLeast(0L)
@@ -575,21 +569,24 @@ fun CapsulePlayerControls(
                 // Material 3 Expressive Gapped Slider
                 CustomSeekbar(
                     duration = safeDuration,
+                    position = displayPosition.toFloat(),
                     onSeek = { targetPos, isFinished ->
+                        val targetMs = targetPos.toLong()
                         if (isFinished) {
-                            scrubPosition = -1L
-                            onSeek(targetPos.toLong(), true)
+                            scrubPosition = targetMs
+                            onSeek(targetMs, true)
                             draggingJob = scope.launch {
-                                delay(800)
+                                delay(150)
+                                scrubPosition = -1L
                                 onDraggingChanged(false)
                             }
                         } else {
-                            scrubPosition = targetPos.toLong()
+                            scrubPosition = targetMs
                             draggingJob?.cancel()
                             val now = System.currentTimeMillis()
-                            if (now - lastSeekTime > 120L) {
+                            if (now - lastSeekTime > 50L) {
                                 lastSeekTime = now
-                                onSeek(targetPos.toLong(), false)
+                                onSeek(targetMs, false)
                             }
                         }
                     },
@@ -602,7 +599,7 @@ fun CapsulePlayerControls(
                     seekbarStyle = seekBarStyle,
                     isPaused = !isPlaying,
                     positionProvider = {
-                        if (isDragging && scrubPosition >= 0L) {
+                        if (scrubPosition >= 0L) {
                             scrubPosition.toFloat()
                         } else {
                             posProvider().toFloat()
@@ -746,21 +743,24 @@ fun CapsulePlayerControls(
 
                     CustomSeekbar(
                         duration = safeDuration,
+                        position = displayPosition.toFloat(),
                         onSeek = { targetPos, isFinished ->
+                            val targetMs = targetPos.toLong()
                             if (isFinished) {
-                                scrubPosition = -1L
-                                onSeek(targetPos.toLong(), true)
+                                scrubPosition = targetMs
+                                onSeek(targetMs, true)
                                 draggingJob = scope.launch {
-                                    delay(800)
+                                    delay(150)
+                                    scrubPosition = -1L
                                     onDraggingChanged(false)
                                 }
                             } else {
-                                scrubPosition = targetPos.toLong()
+                                scrubPosition = targetMs
                                 draggingJob?.cancel()
                                 val now = System.currentTimeMillis()
-                                if (now - lastSeekTime > 120L) {
+                                if (now - lastSeekTime > 50L) {
                                     lastSeekTime = now
-                                    onSeek(targetPos.toLong(), false)
+                                    onSeek(targetMs, false)
                                 }
                             }
                         },
@@ -773,7 +773,7 @@ fun CapsulePlayerControls(
                         seekbarStyle = seekBarStyle,
                         isPaused = !isPlaying,
                         positionProvider = {
-                            if (isDragging && scrubPosition >= 0L) {
+                            if (scrubPosition >= 0L) {
                                 scrubPosition.toFloat()
                             } else {
                                 posProvider().toFloat()

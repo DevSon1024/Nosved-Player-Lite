@@ -386,13 +386,15 @@ fun PlayerControls(
                         if (!isDragging) sliderPosition = currentPosition.toFloat()
                     }
 
+                    val effectivePosition = if (isDragging) sliderPosition.toLong() else currentPosition
+
                     // Row 1: Time + Seekbar + Time
                     Row(
                         modifier = Modifier.fillMaxWidth().offset(y = (-6).dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            formatTime(currentPosition),
+                            formatTime(effectivePosition),
                             color = Color.White,
                             style = MaterialTheme.typography.labelMedium
                         )
@@ -451,7 +453,7 @@ fun PlayerControls(
                         }
 
                         Spacer(Modifier.width(8.dp))
-                        val remaining = if (duration > currentPosition) duration - currentPosition else 0L
+                        val remaining = if (duration > effectivePosition) duration - effectivePosition else 0L
                         Text(
                             text = if (showRemainingTime) "-" + formatTime(remaining) else formatTime(duration),
                             color = Color.White,

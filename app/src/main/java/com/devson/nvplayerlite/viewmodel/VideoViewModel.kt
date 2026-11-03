@@ -378,23 +378,31 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         playerManager?.seekTo(positionMs)
     }
 
+    private var wasPlayingBeforeSeek = false
+
     fun beginSeek() {
         val player = playerManager?.exoPlayer ?: return
-        _isSeeking.value = true
-        _seekPreviewPosition.value = player.currentPosition.coerceAtLeast(0L)
-        playerManager?.pause()
+        if (!_isSeeking.value) {
+            _isSeeking.value = true
+            wasPlayingBeforeSeek = player.isPlaying
+            _seekPreviewPosition.value = (playerManager?.currentPosition?.value ?: player.currentPosition).coerceAtLeast(0L)
+            playerManager?.pause()
+        }
     }
 
     fun updateSeekPreview(positionMs: Long) {
-        val duration = playerManager?.exoPlayer?.duration?.coerceAtLeast(0L) ?: 0L
+        if (!_isSeeking.value) {
+            beginSeek()
+        }
+        val duration = (playerManager?.duration?.value ?: playerManager?.exoPlayer?.duration ?: 0L).coerceAtLeast(0L)
         _seekPreviewPosition.value = positionMs.coerceIn(0L, if (duration > 0L) duration else Long.MAX_VALUE)
     }
 
     fun commitSeek() {
         val target = _seekPreviewPosition.value
         _isSeeking.value = false
-        playerManager?.seekSmooth(target)
-        if (_currentVideo.value != null) {
+        playerManager?.seekTo(target)
+        if (wasPlayingBeforeSeek && _currentVideo.value != null) {
             playerManager?.resume()
         }
     }
@@ -416,17 +424,15 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun debounceSeekByOffset(offsetMs: Long) {
-        val player = playerManager?.exoPlayer ?: return
-        
-        val startPos = accumulatedSeekTarget ?: player.currentPosition
-        val totalDuration = player.duration.coerceAtLeast(0L)
+        val startPos = accumulatedSeekTarget ?: (playerManager?.currentPosition?.value ?: playerManager?.exoPlayer?.currentPosition ?: 0L)
+        val totalDuration = (playerManager?.duration?.value ?: playerManager?.exoPlayer?.duration ?: 0L).coerceAtLeast(0L)
         val newPos = (startPos + offsetMs).coerceIn(0L, totalDuration)
         
         accumulatedSeekTarget = newPos
         
         seekJob?.cancel()
         seekJob = viewModelScope.launch {
-            delay(400)
+            delay(350)
             accumulatedSeekTarget?.let { target ->
                 playerManager?.seekTo(target)
             }
@@ -551,10 +557,10 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     private fun startProgressUpdate() {
         viewModelScope.launch {
             while (true) {
-                if (!_isSeeking.value && playerManager?.isPlaying?.value == true) {
+                if (!_isSeeking.value) {
                     playerManager?.updateProgress()
                 }
-                delay(500)
+                delay(250)
             }
         }
     }

@@ -85,6 +85,7 @@ fun CustomSeekbar(
                     onDraggingChanged(true)
                     onSeek(targetPos, true)
                     scope.launch {
+                        delay(150)
                         isScrubbing = false
                         onDraggingChanged(false)
                     }
@@ -103,6 +104,7 @@ fun CustomSeekbar(
                         val finalPos = latestInteractionPos.coerceIn(0f, safeDuration)
                         onSeek(finalPos, true)
                         scope.launch {
+                            delay(150)
                             isScrubbing = false
                             onDraggingChanged(false)
                         }
@@ -111,6 +113,7 @@ fun CustomSeekbar(
                         val finalPos = latestInteractionPos.coerceIn(0f, safeDuration)
                         onSeek(finalPos, true)
                         scope.launch {
+                            delay(150)
                             isScrubbing = false
                             onDraggingChanged(false)
                         }
@@ -127,6 +130,7 @@ fun CustomSeekbar(
         when (seekbarStyle.lowercase()) {
             "wavy" -> {
                 SquigglySeekbarCanvas(
+                    position = position,
                     positionProvider = currentPositionProvider,
                     duration = safeDuration,
                     isPaused = isPaused,
@@ -137,6 +141,7 @@ fun CustomSeekbar(
             }
             "thick" -> {
                 StandardOrThickSeekbarCanvas(
+                    position = position,
                     positionProvider = currentPositionProvider,
                     duration = safeDuration,
                     isPaused = isPaused,
@@ -148,6 +153,7 @@ fun CustomSeekbar(
             }
             "slim" -> {
                 SlimSeekbarCanvas(
+                    position = position,
                     positionProvider = currentPositionProvider,
                     duration = safeDuration,
                     isPaused = isPaused,
@@ -158,6 +164,7 @@ fun CustomSeekbar(
             }
             else -> {
                 StandardOrThickSeekbarCanvas(
+                    position = position,
                     positionProvider = currentPositionProvider,
                     duration = safeDuration,
                     isPaused = isPaused,
@@ -173,6 +180,7 @@ fun CustomSeekbar(
 
 @Composable
 private fun SquigglySeekbarCanvas(
+    position: Float = 0f,
     positionProvider: () -> Float,
     duration: Float,
     isPaused: Boolean,
@@ -182,7 +190,6 @@ private fun SquigglySeekbarCanvas(
 ) {
     var phaseOffset by remember { mutableFloatStateOf(0f) }
     var heightFraction by remember { mutableFloatStateOf(1f) }
-
     val waveLength = 80f
     val lineAmplitude = 6f
     val phaseSpeed = 10f
@@ -218,6 +225,7 @@ private fun SquigglySeekbarCanvas(
     }
 
     Canvas(modifier = Modifier.fillMaxSize()) {
+        if (position >= 0f) Unit
         val strokeWidth = 5.dp.toPx()
         val currentPos = positionProvider()
         val progress = (currentPos / duration).coerceIn(0f, 1f)
@@ -310,6 +318,7 @@ private fun SquigglySeekbarCanvas(
 
 @Composable
 private fun StandardOrThickSeekbarCanvas(
+    position: Float = 0f,
     positionProvider: () -> Float,
     duration: Float,
     isPaused: Boolean,
@@ -351,6 +360,7 @@ private fun StandardOrThickSeekbarCanvas(
 
     Canvas(modifier = Modifier.fillMaxSize()) {
         if (seekbarTick >= 0L) Unit
+        if (position >= 0f) Unit
         val trackHeight = animatedTrackHeight.toPx()
         val centerY = size.height / 2f
         val topY = centerY - trackHeight / 2f
@@ -452,6 +462,7 @@ private fun StandardOrThickSeekbarCanvas(
 
 @Composable
 private fun SlimSeekbarCanvas(
+    position: Float = 0f,
     positionProvider: () -> Float,
     duration: Float,
     isPaused: Boolean,
@@ -480,6 +491,7 @@ private fun SlimSeekbarCanvas(
 
     Canvas(modifier = Modifier.fillMaxSize()) {
         if (seekbarTick >= 0L) Unit
+        if (position >= 0f) Unit
         val currentPos = positionProvider()
         val progress = (currentPos / duration).coerceIn(0f, 1f)
         val totalWidth = size.width
