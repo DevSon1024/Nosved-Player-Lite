@@ -272,9 +272,9 @@ fun SubtitleSettingsSideSheet(
     }
 }
 
-// -----------------------------------------------------------------------------
+
 // TAB 1: TRACKS SELECTION & IMPORT
-// -----------------------------------------------------------------------------
+
 @Composable
 private fun TracksTab(
     subtitleTracks: List<TrackInfo>,
@@ -443,9 +443,9 @@ private fun TrackCardItem(
     }
 }
 
-// -----------------------------------------------------------------------------
+
 // TAB 2: STYLE & APPEARANCE
-// -----------------------------------------------------------------------------
+
 @Composable
 private fun StyleTab(
     playbackSettings: PlaybackSettings,
@@ -718,9 +718,9 @@ private fun SubtitleLivePreviewCard(playbackSettings: PlaybackSettings) {
     }
 }
 
-// -----------------------------------------------------------------------------
+
 // TAB 3: SYNC & POSITIONING
-// -----------------------------------------------------------------------------
+
 @Composable
 private fun SyncTab(
     playbackSettings: PlaybackSettings,
@@ -945,9 +945,9 @@ private fun SyncTab(
     }
 }
 
-// -----------------------------------------------------------------------------
+
 // REUSABLE HELPER COMPONENTS
-// -----------------------------------------------------------------------------
+
 @Composable
 private fun ToggleCardRow(
     title: String,

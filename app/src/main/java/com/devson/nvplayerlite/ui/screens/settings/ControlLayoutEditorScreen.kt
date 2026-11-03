@@ -33,7 +33,7 @@ import com.devson.nvplayerlite.model.ControlRegion
 import com.devson.nvplayerlite.model.PlayerButton
 import com.devson.nvplayerlite.model.allPlayerButtons
 import com.devson.nvplayerlite.model.AspectMode
-import com.devson.nvplayerlite.ui.icons.AspectIcons
+import com.devson.nvplayerlite.ui.components.getAspectIcon
 import com.devson.nvplayerlite.ui.components.SmoothModalBottomSheet
 import com.devson.nvplayerlite.viewmodel.SettingsViewModel
 import sh.calvin.reorderable.ReorderableItem
@@ -978,12 +978,7 @@ fun PlayerButtonIcon(
             )
         }
     } else if (button == PlayerButton.ASPECT_RATIO) {
-        val icon = when (aspectMode) {
-            AspectMode.FIT -> AspectIcons.Fit
-            AspectMode.STRETCH -> AspectIcons.Stretch
-            AspectMode.CROP -> AspectIcons.Crop
-            AspectMode.ORIGINAL -> AspectIcons.Original
-        }
+        val icon = getAspectIcon(aspectMode)
         Icon(
             imageVector = icon,
             contentDescription = button.displayName,

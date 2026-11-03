@@ -89,6 +89,7 @@ data class PlaybackSettings(
     val keepAwakeAlways: Boolean = false,
     val audioBoosterEnabled: Boolean = false,
     val showUpNextQueue: Boolean = true,
+    val queueLayoutMode: com.devson.nvplayerlite.model.LayoutMode = com.devson.nvplayerlite.model.LayoutMode.LIST,
     val isAmbientModeEnabled: Boolean = false,
     val ambientBlurStyle: String = "standard",
     val saveBrightnessLevel: Boolean = true
@@ -164,6 +165,7 @@ class PlaybackSettingsRepository(private val context: Context) {
         val KEEP_AWAKE_ALWAYS = booleanPreferencesKey("keep_awake_always")
         val AUDIO_BOOSTER_ENABLED = booleanPreferencesKey("audio_booster_enabled")
         val SHOW_UP_NEXT_QUEUE = booleanPreferencesKey("show_up_next_queue")
+        val QUEUE_LAYOUT_MODE = stringPreferencesKey("queue_layout_mode")
         val IS_AMBIENT_MODE_ENABLED = booleanPreferencesKey("is_ambient_mode_enabled")
         val AMBIENT_BLUR_STYLE = stringPreferencesKey("ambient_blur_style")
         val SAVE_BRIGHTNESS_LEVEL = booleanPreferencesKey("save_brightness_level")
@@ -228,6 +230,11 @@ class PlaybackSettingsRepository(private val context: Context) {
                 keepAwakeAlways = preferences[PreferencesKeys.KEEP_AWAKE_ALWAYS] ?: false,
                 audioBoosterEnabled = preferences[PreferencesKeys.AUDIO_BOOSTER_ENABLED] ?: false,
                 showUpNextQueue = preferences[PreferencesKeys.SHOW_UP_NEXT_QUEUE] ?: true,
+                queueLayoutMode = try {
+                    com.devson.nvplayerlite.model.LayoutMode.valueOf(preferences[PreferencesKeys.QUEUE_LAYOUT_MODE] ?: "LIST")
+                } catch (e: Exception) {
+                    com.devson.nvplayerlite.model.LayoutMode.LIST
+                },
                 isAmbientModeEnabled = preferences[PreferencesKeys.IS_AMBIENT_MODE_ENABLED] ?: false,
                 ambientBlurStyle = preferences[PreferencesKeys.AMBIENT_BLUR_STYLE] ?: "standard",
                 saveBrightnessLevel = preferences[PreferencesKeys.SAVE_BRIGHTNESS_LEVEL] ?: true
@@ -457,6 +464,7 @@ class PlaybackSettingsRepository(private val context: Context) {
     suspend fun updateKeepAwakeAlways(enabled: Boolean) { context.dataStore.edit { it[PreferencesKeys.KEEP_AWAKE_ALWAYS] = enabled } }
     suspend fun updateAudioBoosterEnabled(enabled: Boolean) { context.dataStore.edit { it[PreferencesKeys.AUDIO_BOOSTER_ENABLED] = enabled } }
     suspend fun updateShowUpNextQueue(show: Boolean) { context.dataStore.edit { it[PreferencesKeys.SHOW_UP_NEXT_QUEUE] = show } }
+    suspend fun updateQueueLayoutMode(mode: com.devson.nvplayerlite.model.LayoutMode) { context.dataStore.edit { it[PreferencesKeys.QUEUE_LAYOUT_MODE] = mode.name } }
     suspend fun updateIsAmbientModeEnabled(enabled: Boolean) { context.dataStore.edit { it[PreferencesKeys.IS_AMBIENT_MODE_ENABLED] = enabled } }
     suspend fun updateAmbientBlurStyle(style: String) { context.dataStore.edit { it[PreferencesKeys.AMBIENT_BLUR_STYLE] = style } }
     suspend fun updateSaveBrightnessLevel(save: Boolean) { context.dataStore.edit { it[PreferencesKeys.SAVE_BRIGHTNESS_LEVEL] = save } }

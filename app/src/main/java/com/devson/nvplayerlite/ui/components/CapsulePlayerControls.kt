@@ -42,7 +42,6 @@ import androidx.compose.ui.unit.sp
 import com.devson.nvplayerlite.model.AspectMode
 import com.devson.nvplayerlite.model.HdrType
 import com.devson.nvplayerlite.model.PlayerButton
-import com.devson.nvplayerlite.ui.icons.AspectIcons
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -1093,12 +1092,7 @@ fun CapsuleControlItem(
     }
 
     val icon = if (button == PlayerButton.ASPECT_RATIO) {
-        when (currentAspectMode) {
-            AspectMode.FIT -> AspectIcons.Fit
-            AspectMode.STRETCH -> AspectIcons.Stretch
-            AspectMode.CROP -> AspectIcons.Crop
-            AspectMode.ORIGINAL -> AspectIcons.Original
-        }
+        getAspectIcon(currentAspectMode)
     } else {
         button.icon
     }

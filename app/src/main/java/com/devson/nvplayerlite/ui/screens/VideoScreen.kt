@@ -76,6 +76,7 @@ import com.devson.nvplayerlite.ui.components.sheets.AudioSettingsSideSheet
 import com.devson.nvplayerlite.ui.components.sheets.SubtitleSettingsSideSheet
 import com.devson.nvplayerlite.ui.components.sheets.DecoderSideSheet
 import com.devson.nvplayerlite.ui.components.sheets.ChaptersSideSheet
+import com.devson.nvplayerlite.ui.components.sheets.PlayerUpNextQueuePanel
 import com.devson.nvplayerlite.model.PlayerSettingsActions
 import com.devson.nvplayerlite.util.formatDuration
 import com.devson.nvplayerlite.viewmodel.VideoViewModel
@@ -119,7 +120,6 @@ fun VideoScreen(
     val rawVideoDecoderName by viewModel.videoDecoderName?.collectAsState(initial = null)
         ?: remember { mutableStateOf<String?>(null) }
     val videoDecoderName by remember { derivedStateOf { rawVideoDecoderName } }
-    // -------------------------------------------------------------------------------
 
     val controlsVisible by viewModel.controlsVisible.collectAsState()
     val currentVideo by viewModel.currentVideo.collectAsState()
@@ -202,6 +202,7 @@ fun VideoScreen(
     var showSubtitleSettingsSideSheet by rememberSaveable { mutableStateOf(false) }
     var showDecoderSideSheet by rememberSaveable { mutableStateOf(false) }
     var showChaptersSideSheet by rememberSaveable { mutableStateOf(false) }
+    var showQueueSheet by rememberSaveable { mutableStateOf(false) }
 
     var showInfoSheet by remember { mutableStateOf(false) }
 
@@ -210,13 +211,16 @@ fun VideoScreen(
             showSubtitleSettingsSideSheet ||
             showDecoderSideSheet ||
             showChaptersSideSheet ||
-            showInfoSheet
+            showInfoSheet ||
+            showQueueSheet
 
     val shouldInterceptBack = isLocked || isAnySideSheetVisible
 
     val handleBack: () -> Unit = {
         if (isLocked) {
             showUnlockButton = true
+        } else if (showQueueSheet) {
+            showQueueSheet = false
         } else if (showPlayerSettingsSideSheet) {
             showPlayerSettingsSideSheet = false
         } else if (showAudioSettingsSideSheet) {
@@ -757,7 +761,7 @@ fun VideoScreen(
                         viewModel.showControlsAndDelayHide()
                     },
                     onTitleClick = {
-                        showInfoSheet = true
+                        showQueueSheet = true
                         viewModel.showControlsAndDelayHide()
                     },
                     onNextClick = { viewModel.playNextVideo() },
@@ -839,6 +843,10 @@ fun VideoScreen(
                 onModernStyleChange = { settingsViewModel.setModernPlayerStyle(it) },
                 onInfoClick = {
                     showInfoSheet = true
+                    viewModel.showControlsAndDelayHide()
+                },
+                onTitleClick = {
+                    showQueueSheet = true
                     viewModel.showControlsAndDelayHide()
                 },
                 onOpenAudioTracks = { showAudioSettingsSideSheet = true },
@@ -947,6 +955,19 @@ fun VideoScreen(
             useSideSheet = true
         )
     }
+
+    PlayerUpNextQueuePanel(
+        isQueueVisible = showQueueSheet,
+        queueLayoutMode = playbackSettings.queueLayoutMode,
+        queueList = currentPlaylist,
+        currentVideoId = currentVideo?.uri,
+        onQueueVisibleChange = { showQueueSheet = it },
+        onUpdateQueueLayoutMode = { settingsViewModel.updateQueueLayoutMode(it) },
+        onQueueVideoClick = { video ->
+            viewModel.playVideo(video, currentPlaylist)
+            showQueueSheet = false
+        }
+    )
 }
 
 private fun hideSystemUI(activity: Activity) {

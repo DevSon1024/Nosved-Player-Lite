@@ -136,6 +136,7 @@ fun PlayerControls(
     onShowSeekButtonsChange: ((Boolean) -> Unit)? = null,
     onFastplaySpeedChange: ((Float) -> Unit)? = null,
     onInfoClick: (() -> Unit)? = null,
+    onTitleClick: (() -> Unit)? = null,
     onOpenAudioTracks: (() -> Unit)? = null,
     onOpenSubtitles: (() -> Unit)? = null,
     onPlayPrevious: (() -> Unit)? = null,
@@ -274,7 +275,11 @@ fun PlayerControls(
                         style = MaterialTheme.typography.titleMedium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier
+                            .weight(1f)
+                            .then(
+                                if (onTitleClick != null) Modifier.clickable { onTitleClick() } else Modifier
+                            )
                     )
                     TooltipBox(
                         positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),

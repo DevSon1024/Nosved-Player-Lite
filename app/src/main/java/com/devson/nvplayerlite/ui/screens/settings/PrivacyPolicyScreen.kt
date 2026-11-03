@@ -81,7 +81,7 @@ fun PrivacyPolicyScreen(onBack: () -> Unit) {
             ) {
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Hero card – commitment badge
+                // Hero card - commitment badge
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(20.dp),

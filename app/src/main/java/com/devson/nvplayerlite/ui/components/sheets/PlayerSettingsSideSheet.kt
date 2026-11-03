@@ -647,9 +647,9 @@ fun PlayerSettingsSideSheet(
     }
 }
 
-// -----------------------------------------------------------------------------
+
 // TAB 0: SPEED
-// -----------------------------------------------------------------------------
+
 @Composable
 private fun SpeedTab(
     currentSpeed: Float,
@@ -806,7 +806,7 @@ private fun SpeedTab(
             }
         }
 
-        // Speed Slider (0.25x – 4.00x)
+        // Speed Slider (0.25x - 4.00x)
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             SheetSectionLabel("Speed Slider")
             StepSlider(
@@ -880,9 +880,9 @@ private fun SpeedTab(
     }
 }
 
-// -----------------------------------------------------------------------------
+
 // TAB 1: GESTURES & TOUCH
-// -----------------------------------------------------------------------------
+
 @Composable
 private fun GesturesTab(
     playbackSettings: PlaybackSettings,
@@ -959,9 +959,9 @@ private fun GesturesTab(
     }
 }
 
-// -----------------------------------------------------------------------------
+
 // TAB 2: INTERFACE & CONTROLS
-// -----------------------------------------------------------------------------
+
 @Composable
 private fun InterfaceTab(
     playbackSettings: PlaybackSettings,
@@ -1088,9 +1088,9 @@ private fun InterfaceTab(
     }
 }
 
-// -----------------------------------------------------------------------------
+
 // TAB 3: OVERLAYS
-// -----------------------------------------------------------------------------
+
 @Composable
 private fun OverlaysTab(
     playbackSettings: PlaybackSettings,
@@ -1134,9 +1134,9 @@ private fun OverlaysTab(
     }
 }
 
-// -----------------------------------------------------------------------------
+
 // TAB 4: AUTOMATION & BEHAVIORS
-// -----------------------------------------------------------------------------
+
 @Composable
 private fun AutomationTab(
     playbackSettings: PlaybackSettings,
@@ -1178,9 +1178,9 @@ private fun AutomationTab(
     }
 }
 
-// -----------------------------------------------------------------------------
+
 // TAB 5: INFORMATION
-// -----------------------------------------------------------------------------
+
 @Composable
 private fun InformationTab(
     video: Video?
@@ -1247,9 +1247,9 @@ private fun InfoDisplayRow(label: String, value: String) {
     }
 }
 
-// -----------------------------------------------------------------------------
+
 // REUSABLE UI HELPERS
-// -----------------------------------------------------------------------------
+
 @Composable
 private fun SheetSectionLabel(text: String) {
     Text(

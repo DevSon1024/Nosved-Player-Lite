@@ -1,9 +1,9 @@
 # =============================================================================
-# Nosved Player Lite Lite – ProGuard / R8 Rules
+# Nosved Player Lite Lite - ProGuard / R8 Rules
 # Target: Media3 1.11.0 + Kotlinx Serialization + Nextlib
 # =============================================================================
 
-# ── Debug info (uncomment for crash-readable stack traces) ───────────────────
+#  Debug info (uncomment for crash-readable stack traces) 
 # -keepattributes SourceFile,LineNumberTable
 # -renamesourcefileattribute SourceFile
 
@@ -47,7 +47,7 @@
 -dontwarn androidx.media3.ui.**
 
 # Native decoder extension JNI entry points
-# AV1 / Opus / VP9 / FLAC – keep if those optional deps are enabled
+# AV1 / Opus / VP9 / FLAC - keep if those optional deps are enabled
 -keep class androidx.media3.decoder.av1.**   { *; }
 -keep class androidx.media3.decoder.opus.**  { *; }
 -keep class androidx.media3.decoder.vp9.**   { *; }
@@ -125,7 +125,7 @@
     public static final android.os.Parcelable$Creator *;
 }
 
-# Enum values() / valueOf() – used by DataStore and settings enums
+# Enum values() / valueOf() - used by DataStore and settings enums
 -keepclassmembers enum * {
     public static **[] values();
     public static ** valueOf(java.lang.String);

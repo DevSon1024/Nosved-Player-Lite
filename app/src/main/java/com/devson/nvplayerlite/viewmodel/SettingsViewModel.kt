@@ -385,6 +385,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch { settingsRepo.updateShowUpNextQueue(show) }
     }
 
+    fun updateQueueLayoutMode(mode: com.devson.nvplayerlite.model.LayoutMode) {
+        viewModelScope.launch { settingsRepo.updateQueueLayoutMode(mode) }
+    }
+
     fun updateIsAmbientModeEnabled(enabled: Boolean) {
         viewModelScope.launch { settingsRepo.updateIsAmbientModeEnabled(enabled) }
     }

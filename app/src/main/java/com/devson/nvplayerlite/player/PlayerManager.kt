@@ -189,6 +189,7 @@ class PlayerManager(private val context: Context) {
                             if (playbackState == Player.STATE_READY) {
                                 _duration.value = duration.coerceAtLeast(0L)
                             } else if (playbackState == Player.STATE_ENDED) {
+                                _isPlaying.value = false
                                 onVideoEnded?.invoke()
                             }
                         }
@@ -305,7 +306,7 @@ class PlayerManager(private val context: Context) {
                                     _playerError.value = "Hardware unsupported: Your device cannot decode this video format (e.g., HEVC 10-bit)."
                                 }
                                 isSourceError -> {
-                                    // Skip the broken file – notify the ViewModel
+                                    // Skip the broken file - notify the ViewModel
                                     val msg = error.message ?: "Source error"
                                     onPlaybackError?.invoke(msg)
                                 }
@@ -444,6 +445,7 @@ class PlayerManager(private val context: Context) {
         player.setMediaItem(mediaItem)
         player.prepare()
         player.playWhenReady = true
+        _isPlaying.value = true
     }
 
     fun clearError() {
@@ -457,18 +459,22 @@ class PlayerManager(private val context: Context) {
 
     fun playPause() {
         val player = exoPlayer ?: return
-        if (player.isPlaying) {
+        if (player.isPlaying || (player.playWhenReady && player.playbackState != Player.STATE_ENDED)) {
             player.pause()
+            _isPlaying.value = false
         } else {
             player.play()
+            _isPlaying.value = true
         }
     }
 
     fun pause() {
+        _isPlaying.value = false
         exoPlayer?.pause()
     }
 
     fun resume() {
+        _isPlaying.value = true
         exoPlayer?.play()
     }
 

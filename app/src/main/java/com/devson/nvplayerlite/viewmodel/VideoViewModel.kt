@@ -183,6 +183,12 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
             )
             _playerInstance.value = playerManager?.exoPlayer
 
+            viewModelScope.launch {
+                playerManager?.isPlaying?.collect { playing ->
+                    _playingIntent.value = playing
+                }
+            }
+
             playerManager?.onPlayNext = {
                 playNextVideo()
             }
@@ -248,6 +254,11 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                 _defaultSubtitleLang.value
             )
             _playerInstance.value = playerManager?.exoPlayer
+            viewModelScope.launch {
+                playerManager?.isPlaying?.collect { playing ->
+                    _playingIntent.value = playing
+                }
+            }
             playerManager?.onPlayNext = { playNextVideo() }
             playerManager?.onPlayPrevious = { playPreviousVideo() }
             playerManager?.onVideoEnded = {
@@ -269,6 +280,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     fun getPlayer() = _playerInstance.value
 
     fun playVideo(video: Video, playlist: List<Video> = emptyList(), resumePositionMs: Long = 0L) {
+        _playingIntent.value = true
         _currentVideo.value = video
 
         val actualPlaylist = if (playlist.isEmpty()) listOf(video) else playlist
@@ -293,6 +305,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         val playlist = _currentPlaylist.value
         val currentIndex = _currentPlaylistIndex.value
         if (playlist.isNotEmpty() && currentIndex in 0 until playlist.lastIndex) {
+            _playingIntent.value = true
             val nextVideo = playlist[currentIndex + 1]
             playVideo(nextVideo, playlist, 0L)
         }
@@ -302,13 +315,16 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         val playlist = _currentPlaylist.value
         val currentIndex = _currentPlaylistIndex.value
         if (playlist.isNotEmpty() && currentIndex > 0) {
+            _playingIntent.value = true
             val prevVideo = playlist[currentIndex - 1]
             playVideo(prevVideo, playlist, 0L)
         }
     }
 
     fun togglePlayPause() {
-        val willPlay = playerManager?.exoPlayer?.isPlaying == false
+        val player = playerManager?.exoPlayer ?: return
+        val currentlyPlaying = player.isPlaying || (player.playWhenReady && player.playbackState != Player.STATE_ENDED)
+        val willPlay = !currentlyPlaying
         _playingIntent.value = willPlay
         playerManager?.playPause()
     }
