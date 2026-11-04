@@ -362,10 +362,14 @@ fun VideoScreen(
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner, pauseWhenObstructed) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
-            if (pauseWhenObstructed && event == androidx.lifecycle.Lifecycle.Event.ON_PAUSE) {
-                if (player?.isPlaying == true) {
-                    player?.pause()
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_PAUSE) {
+                if (pauseWhenObstructed && player?.isPlaying == true) {
+                    viewModel.pauseVideo()
+                } else {
+                    viewModel.pauseVideo()
                 }
+            } else if (event == androidx.lifecycle.Lifecycle.Event.ON_STOP) {
+                viewModel.pauseVideo()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -686,7 +690,8 @@ fun VideoScreen(
                     },
                     onSeek = { targetPos, isFinished ->
                         if (isFinished) {
-                            viewModel.commitSeek()
+                            viewModel.updateSeekPreview(targetPos)
+                            viewModel.commitSeek(targetPos)
                         } else {
                             viewModel.updateSeekPreview(targetPos)
                         }

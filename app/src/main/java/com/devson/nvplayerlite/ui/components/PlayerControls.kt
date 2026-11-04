@@ -397,31 +397,6 @@ fun PlayerControls(
                     val safeValueRange = 0f..safeDuration
                     val safeSliderPosition = sliderPosition.coerceIn(0f, safeDuration)
 
-                    // Floating Live Scrub Frame Preview
-                    if (isDragging) {
-                        BoxWithConstraints(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(88.dp)
-                                .padding(bottom = 4.dp)
-                        ) {
-                            val cardWidth = 140.dp
-                            val maxOffset = (maxWidth - cardWidth).coerceAtLeast(0.dp)
-                            val scrubFraction = if (safeDuration > 0f) {
-                                (safeSliderPosition / safeDuration).coerceIn(0f, 1f)
-                            } else 0f
-                            val offsetX = maxOffset * scrubFraction
-
-                            SeekPreviewCard(
-                                videoUri = videoUri,
-                                timestampMs = effectivePosition,
-                                modifier = Modifier
-                                    .offset(x = offsetX)
-                                    .align(Alignment.BottomStart)
-                            )
-                        }
-                    }
-
                     // Row 1: Time + Seekbar + Time
                     Row(
                         modifier = Modifier.fillMaxWidth().offset(y = (-6).dp),
@@ -443,13 +418,12 @@ fun PlayerControls(
                                     if (!isDragging) onScrubbingModeChange(true)
                                     isDragging = true
                                     sliderPosition = it
-                                    onSeekTo(it.toLong())
                                 },
                                 onValueChangeFinished = {
                                     onSeekTo(sliderPosition.toLong())
                                     onScrubbingModeChange(false)
                                     draggingJob = scope.launch {
-                                        kotlinx.coroutines.delay(800)
+                                        kotlinx.coroutines.delay(300)
                                         isDragging = false
                                     }
                                 },
@@ -460,15 +434,15 @@ fun PlayerControls(
                                 value = safeSliderPosition,
                                 onValueChange = {
                                     draggingJob?.cancel()
+                                    if (!isDragging) onScrubbingModeChange(true)
                                     isDragging = true
                                     sliderPosition = it
-                                    onSeekTo(it.toLong())
                                 },
                                 onValueChangeFinished = {
                                     onSeekTo(sliderPosition.toLong())
                                     onScrubbingModeChange(false)
                                     draggingJob = scope.launch {
-                                        kotlinx.coroutines.delay(800)
+                                        kotlinx.coroutines.delay(300)
                                         isDragging = false
                                     }
                                 },

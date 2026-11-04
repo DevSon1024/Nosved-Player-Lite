@@ -512,34 +512,6 @@ fun CapsulePlayerControls(
                     .navigationBarsPadding()
                     .padding(start = 16.dp, end = 16.dp, bottom = 20.dp)
             ) {
-                // Floating Live Scrub Frame Preview
-                BoxWithConstraints(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(if (scrubPosition >= 0L) 88.dp else 0.dp)
-                        .padding(bottom = 4.dp)
-                ) {
-                    val cardWidth = 140.dp
-                    val maxOffset = (maxWidth - cardWidth).coerceAtLeast(0.dp)
-                    val scrubFraction = if (safeDuration > 0f && scrubPosition >= 0L) {
-                        (scrubPosition.toFloat() / safeDuration).coerceIn(0f, 1f)
-                    } else 0f
-                    val offsetX = maxOffset * scrubFraction
-
-                    androidx.compose.animation.AnimatedVisibility(
-                        visible = scrubPosition >= 0L,
-                        enter = fadeIn() + scaleIn(initialScale = 0.85f),
-                        exit = fadeOut() + scaleOut(targetScale = 0.85f),
-                        modifier = Modifier
-                            .offset(x = offsetX)
-                            .align(Alignment.BottomStart)
-                    ) {
-                        SeekPreviewCard(
-                            videoUri = videoUri,
-                            timestampMs = scrubPosition
-                        )
-                    }
-                }
 
                 // Balanced Timestamp Row Above Seekbar
                 Row(
@@ -753,35 +725,6 @@ fun CapsulePlayerControls(
                     Spacer(modifier = Modifier.height(if (isCompactLandscape) (sizeSpec.dockToTimelineSpacing - 2.dp).coerceAtLeast(6.dp) else sizeSpec.dockToTimelineSpacing))
                 }
 
-                // Floating Live Scrub Frame Preview
-                BoxWithConstraints(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(if (scrubPosition >= 0L) 88.dp else 0.dp)
-                        .windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Horizontal))
-                        .padding(bottom = 4.dp)
-                ) {
-                    val cardWidth = 140.dp
-                    val maxOffset = (maxWidth - cardWidth).coerceAtLeast(0.dp)
-                    val scrubFraction = if (safeDuration > 0f && scrubPosition >= 0L) {
-                        (scrubPosition.toFloat() / safeDuration).coerceIn(0f, 1f)
-                    } else 0f
-                    val offsetX = maxOffset * scrubFraction
-
-                    androidx.compose.animation.AnimatedVisibility(
-                        visible = scrubPosition >= 0L,
-                        enter = fadeIn() + scaleIn(initialScale = 0.85f),
-                        exit = fadeOut() + scaleOut(targetScale = 0.85f),
-                        modifier = Modifier
-                            .offset(x = offsetX)
-                            .align(Alignment.BottomStart)
-                    ) {
-                        SeekPreviewCard(
-                            videoUri = videoUri,
-                            timestampMs = scrubPosition
-                        )
-                    }
-                }
 
                 // 2. Single Horizontal Timeline Row
                 Row(

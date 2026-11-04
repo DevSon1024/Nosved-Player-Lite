@@ -96,6 +96,11 @@ class PlayerManager(private val context: Context) {
 
     var onPlayPrevious: (() -> Unit)? = null
 
+    var onDecoderFallback: ((DecoderMode) -> Unit)? = null
+
+    var currentDecoderMode: DecoderMode = DecoderMode.HW_PLUS
+        private set
+
     private val _isPlaying = MutableStateFlow(false)
     val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
 
@@ -150,6 +155,7 @@ class PlayerManager(private val context: Context) {
         defaultAudioLang: String = "",
         defaultSubtitleLang: String = ""
     ) {
+        currentDecoderMode = decoderMode
         if (exoPlayer == null) {
             NosvedMedia.initialize(context)
             val extensionMode = when (decoderMode) {
@@ -342,15 +348,38 @@ class PlayerManager(private val context: Context) {
                             val isMediaCodecRendererError = error.message?.contains("MediaCodecVideoRenderer") == true ||
                                     error.errorCode == PlaybackException.ERROR_CODE_DECODING_FAILED
 
+                            val isAudioError = error.message?.contains("Audio", ignoreCase = true) == true ||
+                                    error.cause?.message?.contains("Audio", ignoreCase = true) == true ||
+                                    error.errorCodeName.contains("AUDIO", ignoreCase = true)
+
                             when {
                                 isMediaCodecRendererError -> {
                                     AppLogger.log("Recovering from MediaCodecVideoRenderer crash...")
-                                    val lastPos = exoPlayer?.currentPosition ?: 0L
-                                    exoPlayer?.prepare()
-                                    exoPlayer?.seekTo(lastPos)
+                                    val lastPos = exoPlayer?.currentPosition ?: _currentPosition.value
+                                    if (currentDecoderMode == DecoderMode.HW && onDecoderFallback != null) {
+                                        onDecoderFallback?.invoke(DecoderMode.HW_PLUS)
+                                    } else {
+                                        exoPlayer?.prepare()
+                                        exoPlayer?.seekTo(lastPos)
+                                    }
                                 }
                                 isFormatUnsupported || isDecoderFailed -> {
-                                    _playerError.value = "Hardware unsupported: Your device cannot decode this video format (e.g., HEVC 10-bit)."
+                                    val fallbackMode = when (currentDecoderMode) {
+                                        DecoderMode.HW -> DecoderMode.HW_PLUS
+                                        DecoderMode.SW -> DecoderMode.HW_PLUS
+                                        DecoderMode.HW_PLUS -> if (isAudioError) null else DecoderMode.SW
+                                    }
+                                    if (fallbackMode != null && fallbackMode != currentDecoderMode && onDecoderFallback != null) {
+                                        AppLogger.log("Decoder fallback: Switching from $currentDecoderMode to $fallbackMode due to ${error.errorCodeName}")
+                                        onDecoderFallback?.invoke(fallbackMode)
+                                    } else {
+                                        val errorMsg = if (isAudioError) {
+                                            "Audio format not supported by selected decoder."
+                                        } else {
+                                            "Playback error: Unsupported video format (${error.localizedMessage ?: error.errorCodeName})"
+                                        }
+                                        _playerError.value = errorMsg
+                                    }
                                 }
                                 isSourceError -> {
                                     // Skip the broken file - notify the ViewModel
@@ -358,7 +387,7 @@ class PlayerManager(private val context: Context) {
                                     onPlaybackError?.invoke(msg)
                                 }
                                 else -> {
-                                    _playerError.value = error.message ?: "Unknown playback error"
+                                    _playerError.value = error.localizedMessage ?: error.message ?: "Unknown playback error"
                                 }
                             }
                         }
@@ -484,12 +513,17 @@ class PlayerManager(private val context: Context) {
         }
     }
 
-    fun playVideo(video: Video) {
+    fun playVideo(video: Video, startPositionMs: Long = 0L) {
         val player = exoPlayer ?: return
         _playerError.value = null
         _chapters.value = emptyList()
         val mediaItem = MediaItem.fromUri(video.uri)
-        player.setMediaItem(mediaItem)
+        if (startPositionMs > 0L) {
+            player.setMediaItem(mediaItem, startPositionMs)
+            _currentPosition.value = startPositionMs
+        } else {
+            player.setMediaItem(mediaItem)
+        }
         player.prepare()
         player.playWhenReady = true
         _isPlaying.value = true
@@ -573,8 +607,8 @@ class PlayerManager(private val context: Context) {
     }
 
     fun releasePlayerAndKeepState(): Pair<Long, Boolean> {
-        val pos = exoPlayer?.currentPosition ?: 0L
-        val playing = exoPlayer?.isPlaying ?: false
+        val pos = exoPlayer?.currentPosition?.takeIf { it > 0L } ?: _currentPosition.value
+        val playing = exoPlayer?.isPlaying ?: _isPlaying.value
         releasePlayer()
         return Pair(pos, playing)
     }
