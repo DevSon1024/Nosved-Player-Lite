@@ -154,7 +154,9 @@ fun PlayerControls(
     currentDecoder: DecoderMode = DecoderMode.HW_PLUS,
     onSelectDecoder: ((DecoderMode) -> Unit)? = null,
     onScrubbingModeChange: (Boolean) -> Unit = {},
-    onSpeedMenuClick: (() -> Unit)? = null
+    onSpeedMenuClick: (() -> Unit)? = null,
+    playbackSettings: com.devson.nvplayerlite.repository.PlaybackSettings? = null,
+    playerSettingsActions: com.devson.nvplayerlite.model.PlayerSettingsActions? = null
 ) {
     var showSettingsSheet by remember { mutableStateOf(false) }
     var showDecoderDialog by remember { mutableStateOf(false) }
@@ -640,6 +642,8 @@ fun PlayerControls(
     PlaybackSettingsSheet(
         showSettingsSheet = showSettingsSheet,
         sheetState = sheetState,
+        playbackSettings = playbackSettings,
+        actions = playerSettingsActions,
         seekDurationSeconds = seekDurationSeconds,
         seekBarStyle = seekBarStyle,
         controlIconSize = controlIconSize,

@@ -258,7 +258,10 @@ fun VideoScreen(
             onUpdateSaveBrightnessLevel = { settingsViewModel.updateSaveBrightnessLevel(it) },
             onUpdateIsBottomLayoutEnabled = { settingsViewModel.updateIsBottomLayoutEnabled(it) },
             onUpdateShowControlGradients = { settingsViewModel.updateShowControlGradients(it) },
-            onUpdateBackgroundPlayEnabled = { settingsViewModel.updateBackgroundPlayEnabled(it) }
+            onUpdateBackgroundPlayEnabled = { settingsViewModel.updateBackgroundPlayEnabled(it) },
+            onUpdateShowStatsOverlay = { settingsViewModel.updateShowStatsOverlay(it) },
+            onUpdateShowElapsedTimeOverlay = { settingsViewModel.updateShowElapsedTimeOverlay(it) },
+            onUpdateShowScreenRotationButton = { settingsViewModel.updateShowScreenRotationButton(it) }
         )
     }
 
@@ -837,6 +840,8 @@ fun VideoScreen(
                 onFastplaySpeedChange = { viewModel.setFastplaySpeed(it) },
                 useModernStyle = useModernStyle,
                 onModernStyleChange = { settingsViewModel.setModernPlayerStyle(it) },
+                playbackSettings = playbackSettings,
+                playerSettingsActions = playerSettingsActions,
                 onInfoClick = {
                     showInfoSheet = true
                     viewModel.showControlsAndDelayHide()
