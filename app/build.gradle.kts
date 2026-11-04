@@ -184,7 +184,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
 
     // NosvedMedia: Media3 software video decoder integration (FFmpeg + dav1d)
-    implementation("com.devson.nosvedmedia:nosved-media3:1.0.0")
+    implementation("com.nosved.nosvedmedia:nosved-media3:1.0.0")
     
     // DataStore for Settings
     implementation("androidx.datastore:datastore-preferences:1.0.0")

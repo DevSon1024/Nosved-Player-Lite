@@ -53,7 +53,7 @@ import androidx.compose.ui.unit.sp
 import androidx.media3.common.C
 import androidx.media3.common.Format
 import androidx.media3.common.Player
-import com.devson.nosvedmedia.NosvedMedia
+import com.nosved.nosvedmedia.NosvedMedia
 import kotlinx.coroutines.delay
 import java.io.BufferedReader
 import java.io.FileReader

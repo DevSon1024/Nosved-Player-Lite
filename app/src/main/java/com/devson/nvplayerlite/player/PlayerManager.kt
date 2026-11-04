@@ -17,8 +17,8 @@ import androidx.media3.common.MediaItem.SubtitleConfiguration
 import android.net.Uri
 import androidx.media3.common.util.UnstableApi
 import androidx.annotation.OptIn
-import com.devson.nosvedmedia.NosvedMedia
-import com.devson.nosvedmedia.media3.FFmpegRenderersFactory
+import com.nosved.nosvedmedia.NosvedMedia
+import com.nosved.nosvedmedia.media3.FFmpegRenderersFactory
 import androidx.media3.exoplayer.upstream.Loader
 import android.media.audiofx.LoudnessEnhancer
 import com.devson.nvplayerlite.util.AppLogger
