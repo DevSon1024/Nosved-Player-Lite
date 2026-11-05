@@ -163,18 +163,23 @@ class PlayerManager(private val context: Context) {
                 DecoderMode.HW_PLUS -> androidx.media3.exoplayer.DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON
                 DecoderMode.SW      -> androidx.media3.exoplayer.DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER
             }
-            val renderersFactory = HDRFallbackRenderersFactory(context)
-                .setExtensionRendererMode(extensionMode)
-                .setEnableDecoderFallback(true)
-                .forceDisableMediaCodecAsynchronousQueueing()
+            val renderersFactory = HDRFallbackRenderersFactory(context).apply {
+                setExtensionRendererMode(extensionMode)
+                setEnableDecoderFallback(true)
+                forceDisableMediaCodecAsynchronousQueueing()
+                if (decoderMode == DecoderMode.SW) {
+                    setSoftwareDecoderPriority(com.nosved.nosvedmedia.media3.SoftwareDecoderPriority.PREFER)
+                }
+            }
 
             val loadControl = DefaultLoadControl.Builder()
                 .setBufferDurationsMs(
                     DefaultLoadControl.DEFAULT_MIN_BUFFER_MS,
                     DefaultLoadControl.DEFAULT_MAX_BUFFER_MS,
-                    500,
-                    1000
+                    1500,
+                    2500
                 )
+                .setPrioritizeTimeOverSizeThresholds(true)
                 .build()
 
             val audioAttributes = AudioAttributes.Builder()
