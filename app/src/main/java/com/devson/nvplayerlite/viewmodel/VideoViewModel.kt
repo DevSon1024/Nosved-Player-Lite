@@ -55,6 +55,11 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     val videoFps get() = playerManager?.videoFps
     val videoDecoderName get() = playerManager?.videoDecoderName
     val audioDecoderName get() = playerManager?.audioDecoderName
+    val videoDecoderState get() = playerManager?.videoDecoderState
+    val audioDecoderState get() = playerManager?.audioDecoderState
+    val fallbackReason get() = playerManager?.fallbackReason
+    val averageDecodeLatencyMs get() = playerManager?.averageDecodeLatencyMs
+    val framesDropped get() = playerManager?.framesDropped
 
     // --- Audio & Subtitle Tracks from Manager ---
     val audioTracks get() = playerManager?.audioTracks
