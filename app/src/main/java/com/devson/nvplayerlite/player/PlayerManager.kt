@@ -124,6 +124,9 @@ class PlayerManager(private val context: Context) {
     private val _videoDecoderName = MutableStateFlow<String?>(null)
     val videoDecoderName: StateFlow<String?> = _videoDecoderName.asStateFlow()
 
+    private val _audioDecoderName = MutableStateFlow<String?>(null)
+    val audioDecoderName: StateFlow<String?> = _audioDecoderName.asStateFlow()
+
     private val _playerError = MutableStateFlow<String?>(null)
     val playerError: StateFlow<String?> = _playerError.asStateFlow()
 
@@ -416,6 +419,15 @@ class PlayerManager(private val context: Context) {
                         ) {
                             _videoDecoderName.value = decoderName
                         }
+
+                        override fun onAudioDecoderInitialized(
+                            eventTime: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime,
+                            decoderName: String,
+                            initializedTimestampMs: Long,
+                            initializationDurationMs: Long
+                        ) {
+                            _audioDecoderName.value = decoderName
+                        }
                     })
 
                     // Dynamically calculate FPS for SW decoders which often lack format fps
@@ -619,6 +631,8 @@ class PlayerManager(private val context: Context) {
     }
 
     fun releasePlayer() {
+        _videoDecoderName.value = null
+        _audioDecoderName.value = null
         mediaSession?.release()
         mediaSession = null
         exoPlayer?.release()

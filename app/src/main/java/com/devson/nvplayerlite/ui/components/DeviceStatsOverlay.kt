@@ -25,8 +25,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Analytics
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.sp
 import androidx.media3.common.C
 import androidx.media3.common.Format
 import androidx.media3.common.Player
+import com.devson.nvplayerlite.repository.DecoderMode
 import com.nosved.nosvedmedia.NosvedMedia
 import kotlinx.coroutines.delay
 import java.io.BufferedReader
@@ -68,32 +69,52 @@ data class DeviceStats(
     val videoFps: Float = 0f
 )
 
+data class DecoderInfo(
+    val badge: String,
+    val isHardware: Boolean,
+    val decoderName: String,
+    val technology: String
+)
+
 data class PlaybackStats(
+    // Video Track
     val videoResolution: String = "N/A",
-    val videoCodec: String = "N/A",
+    val videoCodecMime: String = "N/A",
+    val videoCodecFriendly: String = "N/A",
     val videoBitrate: String = "N/A",
+    val videoFramerate: String = "N/A",
     val videoTracksCount: Int = 0,
-    val audioCodec: String = "N/A",
+    val videoDecoderInfo: DecoderInfo = DecoderInfo("HW", true, "MediaCodec", "Hardware Accelerated Pipeline"),
+
+    // Audio Track
+    val audioCodecMime: String = "N/A",
+    val audioCodecFriendly: String = "N/A",
     val audioSampleRate: String = "N/A",
     val audioChannels: String = "N/A",
-    val audioLanguage: String = "N/A",
+    val audioLanguage: String = "None",
+    val audioTrackLabel: String = "None",
     val audioTracksCount: Int = 0,
-    val audioAllLanguages: String = "N/A",
-    val subtitleCodec: String = "None",
+    val audioOtherLanguages: String = "",
+    val audioDecoderInfo: DecoderInfo = DecoderInfo("HW", true, "MediaCodec / AudioTrack", "Hardware Accelerated Audio"),
+
+    // Subtitle Track
+    val hasActiveSubtitle: Boolean = false,
+    val subtitleCodecMime: String = "None",
+    val subtitleCodecFriendly: String = "None",
     val subtitleLanguage: String = "None",
     val subtitleTracksCount: Int = 0,
-    val subtitleAllLanguages: String = "N/A",
-    val bufferHealth: String = "0 / 0 s",
+    val subtitleOtherLanguages: String = "",
+
+    // Playback & Display
+    val bufferHealth: String = "0.0 / 0.0 s",
     val playbackSpeed: String = "1.00x",
     val displayRefreshRate: String = "N/A",
     val screenResolution: String = "N/A",
-    val reportedFps: Float = 0f,
-    val formatFps: Float = 0f,
+
+    // Engine Core
     val nosvedVersion: String = "1.0.0",
     val ffmpegVersion: String = "7.1",
-    val dav1dVersion: String = "1.5.0",
-    val isNosvedInitialized: Boolean = false,
-    val isCodecSupportedByNosved: Boolean = false
+    val dav1dVersion: String = "1.5.0"
 )
 
 @Composable
@@ -103,17 +124,26 @@ fun DeviceStatsOverlay(
     modifier: Modifier = Modifier,
     videoFps: Float = 0f,
     videoDecoderName: String? = null,
+    audioDecoderName: String? = null,
+    decoderMode: DecoderMode? = null,
     onDismiss: () -> Unit = {}
 ) {
     val context = LocalContext.current
     var deviceStats by remember { mutableStateOf(DeviceStats()) }
     var playbackStats by remember { mutableStateOf(PlaybackStats()) }
 
-    LaunchedEffect(visible) {
+    LaunchedEffect(visible, player, videoDecoderName, audioDecoderName, decoderMode) {
         if (visible) {
             while (true) {
                 deviceStats = collectStats(context, videoFps)
-                playbackStats = collectPlaybackStats(player, context, videoFps)
+                playbackStats = collectPlaybackStats(
+                    player = player,
+                    context = context,
+                    reportedFps = videoFps,
+                    videoDecoderName = videoDecoderName,
+                    audioDecoderName = audioDecoderName,
+                    decoderMode = decoderMode
+                )
                 delay(1000)
             }
         }
@@ -127,12 +157,16 @@ fun DeviceStatsOverlay(
     ) {
         Card(
             modifier = Modifier
-                .widthIn(min = 300.dp, max = 360.dp)
-                .heightIn(max = 500.dp)
+                .widthIn(min = 310.dp, max = 370.dp)
+                .heightIn(max = 520.dp)
                 .padding(8.dp),
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)
+                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f)
+            ),
+            border = androidx.compose.foundation.BorderStroke(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f)
             ),
             elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
         ) {
@@ -140,7 +174,7 @@ fun DeviceStatsOverlay(
                 modifier = Modifier
                     .padding(16.dp)
                     .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 // Header with Close
                 Row(
@@ -183,83 +217,158 @@ fun DeviceStatsOverlay(
                     }
                 }
 
-                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.20f))
 
-                // Video Section
-                StatsSectionHeader("VIDEO & DECODER")
+                // 1. VIDEO TRACK & DECODER
+                TrackSectionHeader(
+                    title = "VIDEO TRACK & DECODER",
+                    badge = playbackStats.videoDecoderInfo.badge,
+                    isHardware = playbackStats.videoDecoderInfo.isHardware
+                )
+                StatItem("Active Decoder", playbackStats.videoDecoderInfo.decoderName)
+                StatItem("Technology", playbackStats.videoDecoderInfo.technology)
+                StatItem("Codec", "${playbackStats.videoCodecFriendly} (${playbackStats.videoCodecMime})")
                 StatItem("Resolution", playbackStats.videoResolution)
-
-                val fpsToDisplay = if (playbackStats.reportedFps > 0f) {
-                    "%.2f fps".format(playbackStats.reportedFps)
-                } else if (playbackStats.formatFps > 0f) {
-                    "%.2f fps".format(playbackStats.formatFps)
-                } else {
-                    "N/A"
+                StatItem("Framerate", playbackStats.videoFramerate)
+                StatItem("Bitrate", playbackStats.videoBitrate)
+                if (playbackStats.videoTracksCount > 1) {
+                    StatItem("Video Streams", "${playbackStats.videoTracksCount} track(s)")
                 }
-                StatItem("Framerate (FPS)", fpsToDisplay, Color(0xFF64B5F6))
-                StatItem("Video Bitrate", playbackStats.videoBitrate)
-                StatItem("Video Codec", playbackStats.videoCodec)
 
-                val decoderLabel = when {
-                    videoDecoderName == null -> "-"
-                    videoDecoderName.contains("c2.android", ignoreCase = true) -> "[SW] $videoDecoderName"
-                    videoDecoderName.contains("omx.google", ignoreCase = true) -> "[SW] $videoDecoderName"
-                    videoDecoderName.contains("ffmpeg", ignoreCase = true) -> "[SW] NosvedMedia FFmpeg"
-                    videoDecoderName.contains("dav1d", ignoreCase = true) -> "[SW] NosvedMedia dav1d"
-                    else -> "[HW] $videoDecoderName"
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.20f))
+
+                // 2. AUDIO TRACK & DECODER
+                TrackSectionHeader(
+                    title = "AUDIO TRACK & DECODER",
+                    badge = playbackStats.audioDecoderInfo.badge,
+                    isHardware = playbackStats.audioDecoderInfo.isHardware
+                )
+                StatItem("Active Track", "${playbackStats.audioTrackLabel} (${playbackStats.audioLanguage})")
+                StatItem("Active Decoder", playbackStats.audioDecoderInfo.decoderName)
+                StatItem("Technology", playbackStats.audioDecoderInfo.technology)
+                StatItem("Codec", "${playbackStats.audioCodecFriendly} (${playbackStats.audioCodecMime})")
+                StatItem("Channels", playbackStats.audioChannels)
+                StatItem("Sample Rate", playbackStats.audioSampleRate)
+                if (playbackStats.audioTracksCount > 1) {
+                    val otherLangs = playbackStats.audioOtherLanguages.ifBlank { "None" }
+                    StatItem("Tracks (${playbackStats.audioTracksCount})", otherLangs)
                 }
-                val isSwDecoder = decoderLabel.contains("[SW]")
-                StatItem("Active Decoder", decoderLabel, if (isSwDecoder) Color(0xFFFFB74D) else Color(0xFF81C784))
 
-                val nosvedSupportStatus = if (playbackStats.isCodecSupportedByNosved) {
-                    "Supported (SW fallback ready)"
-                } else {
-                    "Hardware standard"
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.20f))
+
+                // 3. SUBTITLE TRACK
+                TrackSectionHeader(
+                    title = "SUBTITLE TRACK",
+                    badge = if (playbackStats.hasActiveSubtitle) "ACTIVE" else "OFF",
+                    isHardware = !playbackStats.hasActiveSubtitle
+                )
+                StatItem("Active Subtitle", if (playbackStats.hasActiveSubtitle) playbackStats.subtitleLanguage else "None")
+                if (playbackStats.hasActiveSubtitle) {
+                    StatItem("Format / Codec", "${playbackStats.subtitleCodecFriendly} (${playbackStats.subtitleCodecMime})")
+                    StatItem("Technology", "Media3 SubtitleParser + Compose")
                 }
-                StatItem("NosvedMedia Support", nosvedSupportStatus, if (playbackStats.isCodecSupportedByNosved) Color(0xFF81C784) else MaterialTheme.colorScheme.onSurfaceVariant)
+                if (playbackStats.subtitleTracksCount > 0) {
+                    val subText = if (playbackStats.subtitleOtherLanguages.isNotBlank()) playbackStats.subtitleOtherLanguages else "${playbackStats.subtitleTracksCount} track(s)"
+                    StatItem("Available Subs", subText)
+                }
 
-                // NosvedMedia Engine Section
-                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f))
-                StatsSectionHeader("NOSVEDMEDIA CORE")
-                StatItem("Library Version", "v${playbackStats.nosvedVersion} (Active)")
-                StatItem("FFmpeg Core", "v${playbackStats.ffmpegVersion}")
-                StatItem("dav1d Core (AV1)", "v${playbackStats.dav1dVersion}")
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.20f))
 
-                // Tracks Information Section
-                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f))
-                StatsSectionHeader("MEDIA TRACKS")
-                StatItem("Video Tracks", "${playbackStats.videoTracksCount} track(s)")
-                StatItem("Active Audio", "${playbackStats.audioLanguage} • ${playbackStats.audioCodec}")
-                StatItem("Audio Channels", "${playbackStats.audioChannels} @ ${playbackStats.audioSampleRate}")
-                StatItem("Audio Tracks", "${playbackStats.audioTracksCount} track(s) [${playbackStats.audioAllLanguages}]")
-                StatItem("Active Subtitle", "${playbackStats.subtitleLanguage} • ${playbackStats.subtitleCodec}")
-                StatItem("Subtitle Tracks", "${playbackStats.subtitleTracksCount} track(s) [${playbackStats.subtitleAllLanguages}]")
-
-                // Playback & Display
-                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f))
+                // 4. PLAYBACK & DISPLAY
                 StatsSectionHeader("PLAYBACK & DISPLAY")
-                StatItem("Buffer (Buf/Cur)", playbackStats.bufferHealth)
+                StatItem("Buffer Health", playbackStats.bufferHealth)
                 StatItem("Playback Speed", playbackStats.playbackSpeed)
                 StatItem("Display Refresh", playbackStats.displayRefreshRate)
-                StatItem("Display Resolution", playbackStats.screenResolution)
+                StatItem("Screen Resolution", playbackStats.screenResolution)
 
-                // System Resources
-                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f))
-                StatsSectionHeader("SYSTEM HEALTH")
-                StatItem("CPU Usage", "${deviceStats.cpuPercent}%", levelColor(deviceStats.cpuPercent.toFloat() / 100f))
-                StatItem("Memory (RAM)", "${deviceStats.usedMemMb} / ${deviceStats.totalMemMb} MB", Color.Cyan.copy(alpha = 0.85f))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.20f))
+
+                // 5. SYSTEM & ENGINE
+                StatsSectionHeader("SYSTEM & ENGINE")
+                StatItem(
+                    "NosvedMedia Core",
+                    "v${playbackStats.nosvedVersion} (FFmpeg ${playbackStats.ffmpegVersion}, dav1d ${playbackStats.dav1dVersion})"
+                )
+                val defaultValColor = MaterialTheme.colorScheme.onSurface
+                StatItem(
+                    "CPU Usage",
+                    "${deviceStats.cpuPercent}%",
+                    cpuWarningColor(deviceStats.cpuPercent, defaultValColor)
+                )
+
+                val ramText = if (deviceStats.totalMemMb > 1024) {
+                    "%.1f / %.1f GB".format(deviceStats.usedMemMb / 1024f, deviceStats.totalMemMb / 1024f)
+                } else {
+                    "${deviceStats.usedMemMb} / ${deviceStats.totalMemMb} MB"
+                }
+                StatItem(
+                    "Memory (RAM)",
+                    ramText,
+                    memWarningColor(deviceStats.usedMemMb, deviceStats.totalMemMb, defaultValColor)
+                )
                 StatItem(
                     "Battery",
                     "${deviceStats.batteryPercent}% ${if (deviceStats.batteryCharging) "⚡" else ""}",
-                    batteryColor(deviceStats.batteryPercent)
+                    batteryWarningColor(deviceStats.batteryPercent, defaultValColor)
                 )
                 StatItem(
                     "Temperature",
                     if (deviceStats.tempCelsius > 0f) "%.1f°C".format(deviceStats.tempCelsius) else "N/A",
-                    tempColor(deviceStats.tempCelsius)
+                    tempWarningColor(deviceStats.tempCelsius, defaultValColor)
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun TrackSectionHeader(
+    title: String,
+    badge: String? = null,
+    isHardware: Boolean? = null
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 4.dp, bottom = 2.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = title,
+            color = MaterialTheme.colorScheme.primary,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 0.8.sp
+        )
+        if (badge != null && isHardware != null) {
+            DecoderBadge(badge = badge, isHardware = isHardware)
+        }
+    }
+}
+
+@Composable
+private fun DecoderBadge(badge: String, isHardware: Boolean) {
+    val (bgColor, textColor) = if (badge == "PCM") {
+        Color(0x222196F3) to Color(0xFF90CAF9)
+    } else if (isHardware) {
+        Color(0x224CAF50) to Color(0xFF81C784)
+    } else {
+        Color(0x28FF9800) to Color(0xFFFFB74D)
+    }
+    Surface(
+        color = bgColor,
+        shape = RoundedCornerShape(4.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, textColor.copy(alpha = 0.45f))
+    ) {
+        Text(
+            text = badge,
+            color = textColor,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            fontSize = 10.sp,
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp)
+        )
     }
 }
 
@@ -270,51 +379,285 @@ private fun StatsSectionHeader(title: String) {
         color = MaterialTheme.colorScheme.primary,
         style = MaterialTheme.typography.labelSmall,
         fontWeight = FontWeight.Bold,
-        letterSpacing = 1.0.sp
+        letterSpacing = 0.8.sp,
+        modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)
     )
 }
 
 @Composable
-private fun StatItem(label: String, value: String, valueColor: Color = MaterialTheme.colorScheme.onSurface) {
+private fun StatItem(
+    label: String,
+    value: String,
+    valueColor: Color = MaterialTheme.colorScheme.onSurface
+) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 1.5.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 1.5.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
             text = label,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.70f),
             style = MaterialTheme.typography.bodySmall,
+            fontSize = 11.sp,
             modifier = Modifier.weight(1f)
         )
         Text(
             text = value,
             color = valueColor,
             style = MaterialTheme.typography.bodySmall,
-            fontWeight = FontWeight.SemiBold,
+            fontWeight = FontWeight.Medium,
             fontFamily = FontFamily.Monospace,
+            fontSize = 11.5.sp,
             textAlign = androidx.compose.ui.text.style.TextAlign.End,
             modifier = Modifier.padding(start = 8.dp)
         )
     }
 }
 
-private fun collectPlaybackStats(player: Player?, context: Context, reportedFps: Float): PlaybackStats {
+private fun parseVideoDecoder(
+    decoderName: String?,
+    sampleMimeType: String?,
+    decoderMode: DecoderMode?
+): DecoderInfo {
+    if (decoderName != null) {
+        val lower = decoderName.lowercase()
+        return when {
+            lower.contains("ffmpeg") -> DecoderInfo(
+                badge = "SW",
+                isHardware = false,
+                decoderName = "NosvedMedia FFmpeg Video",
+                technology = "FFmpeg 7.1 Native Multi-threaded (libavcodec)"
+            )
+            lower.contains("dav1d") -> DecoderInfo(
+                badge = "SW",
+                isHardware = false,
+                decoderName = "NosvedMedia dav1d Video",
+                technology = "dav1d 1.5.0 SIMD AV1 Native"
+            )
+            lower.contains("c2.android") || lower.contains("omx.google") -> DecoderInfo(
+                badge = "SW",
+                isHardware = false,
+                decoderName = decoderName,
+                technology = "Android Platform Software Codec"
+            )
+            lower.contains("c2.qti") || lower.contains("omx.qcom") -> DecoderInfo(
+                badge = "HW",
+                isHardware = true,
+                decoderName = decoderName,
+                technology = "Qualcomm MediaCodec (Hardware NDK)"
+            )
+            lower.contains("c2.exynos") || lower.contains("omx.exynos") -> DecoderInfo(
+                badge = "HW",
+                isHardware = true,
+                decoderName = decoderName,
+                technology = "Samsung Exynos MediaCodec (Hardware NDK)"
+            )
+            lower.contains("c2.mtk") || lower.contains("omx.mtk") -> DecoderInfo(
+                badge = "HW",
+                isHardware = true,
+                decoderName = decoderName,
+                technology = "MediaTek MediaCodec (Hardware NDK)"
+            )
+            else -> DecoderInfo(
+                badge = "HW",
+                isHardware = true,
+                decoderName = decoderName,
+                technology = "Hardware Accelerated MediaCodec"
+            )
+        }
+    }
+
+    return when (decoderMode) {
+        DecoderMode.SW -> DecoderInfo(
+            badge = "SW",
+            isHardware = false,
+            decoderName = if (sampleMimeType == "video/av01") "NosvedMedia dav1d" else "NosvedMedia FFmpeg",
+            technology = "NosvedMedia Native Software Engine"
+        )
+        DecoderMode.HW -> DecoderInfo(
+            badge = "HW",
+            isHardware = true,
+            decoderName = "MediaCodec Hardware",
+            technology = "Hardware Accelerated MediaCodec"
+        )
+        else -> DecoderInfo(
+            badge = "HW+",
+            isHardware = true,
+            decoderName = "MediaCodec + Nosved Fallback",
+            technology = "Hardware with Software Fallback"
+        )
+    }
+}
+
+private fun parseAudioDecoder(
+    decoderName: String?,
+    sampleMimeType: String?,
+    decoderMode: DecoderMode?
+): DecoderInfo {
+    if (sampleMimeType == "audio/raw") {
+        return DecoderInfo(
+            badge = "PCM",
+            isHardware = true,
+            decoderName = "System AudioTrack",
+            technology = "Direct Linear PCM Passthrough"
+        )
+    }
+
+    if (decoderName != null) {
+        val lower = decoderName.lowercase()
+        return when {
+            lower.contains("ffmpeg") -> DecoderInfo(
+                badge = "SW",
+                isHardware = false,
+                decoderName = "NosvedMedia FFmpeg Audio",
+                technology = "FFmpeg 7.1 Audio Decoding (libswresample)"
+            )
+            lower.contains("c2.android") || lower.contains("omx.google") -> DecoderInfo(
+                badge = "SW",
+                isHardware = false,
+                decoderName = decoderName,
+                technology = "Android Platform Software Codec"
+            )
+            lower.contains("c2.qti") || lower.contains("omx.qcom") || lower.contains("c2.exynos") || lower.contains("c2.mtk") -> DecoderInfo(
+                badge = "HW",
+                isHardware = true,
+                decoderName = decoderName,
+                technology = "Hardware Accelerated MediaCodec Audio"
+            )
+            else -> DecoderInfo(
+                badge = "HW",
+                isHardware = true,
+                decoderName = decoderName,
+                technology = "Hardware Accelerated Audio Pipeline"
+            )
+        }
+    }
+
+    return when (decoderMode) {
+        DecoderMode.SW -> DecoderInfo(
+            badge = "SW",
+            isHardware = false,
+            decoderName = "NosvedMedia FFmpeg Audio",
+            technology = "FFmpeg 7.1 Audio Software Engine"
+        )
+        else -> DecoderInfo(
+            badge = "HW",
+            isHardware = true,
+            decoderName = "Android MediaCodec / AudioTrack",
+            technology = "Hardware Accelerated Audio Pipeline"
+        )
+    }
+}
+
+private fun friendlyVideoCodec(mime: String?): String = when (mime) {
+    "video/hevc" -> "HEVC / H.265"
+    "video/avc" -> "AVC / H.264"
+    "video/av01" -> "AV1"
+    "video/x-vnd.on2.vp9" -> "VP9"
+    "video/x-vnd.on2.vp8" -> "VP8"
+    "video/mp4v-es" -> "MPEG-4 Part 2"
+    "video/mpeg2" -> "MPEG-2"
+    "video/wvc1" -> "VC-1"
+    "video/dolby-vision" -> "Dolby Vision"
+    null, "N/A" -> "N/A"
+    else -> mime.substringAfter("video/").uppercase()
+}
+
+private fun friendlyAudioCodec(mime: String?): String = when (mime) {
+    "audio/eac3", "audio/eac3-joc" -> "Dolby Digital Plus (E-AC-3)"
+    "audio/ac3" -> "Dolby Digital (AC-3)"
+    "audio/mp4a-latm" -> "AAC"
+    "audio/opus" -> "Opus"
+    "audio/flac" -> "FLAC Lossless"
+    "audio/true-hd" -> "Dolby TrueHD"
+    "audio/vnd.dts" -> "DTS Digital Surround"
+    "audio/vnd.dts.hd" -> "DTS-HD Master Audio"
+    "audio/raw" -> "Linear PCM"
+    "audio/vorbis" -> "Vorbis"
+    "audio/mpeg", "audio/mp3" -> "MP3"
+    null, "N/A" -> "N/A"
+    else -> mime.substringAfter("audio/").uppercase()
+}
+
+private fun friendlySubtitleCodec(mime: String?): String = when (mime) {
+    "application/x-subrip" -> "SubRip (SRT)"
+    "text/x-ssa" -> "SubStation Alpha (SSA)"
+    "text/x-ass" -> "Advanced SSA (ASS)"
+    "text/vtt" -> "WebVTT"
+    "application/pgs" -> "PGS Bitmap"
+    "application/dvbsubs" -> "DVB Subtitles"
+    "application/ttml+xml" -> "TTML"
+    null, "None", "N/A" -> "Text"
+    else -> mime.substringAfterLast("/")
+}
+
+private fun formatLanguage(lang: String?): String {
+    if (lang.isNullOrBlank() || lang == "und") return "Unknown"
+    return try {
+        val loc = java.util.Locale(lang)
+        val disp = loc.displayLanguage
+        if (disp.isNotBlank()) disp.replaceFirstChar { if (it.isLowerCase()) it.titlecase(loc) else it.toString() } else lang
+    } catch (_: Exception) {
+        lang
+    }
+}
+
+private fun cpuWarningColor(percent: Int, defaultColor: Color): Color = when {
+    percent >= 85 -> Color(0xFFEF5350)
+    percent >= 70 -> Color(0xFFFFB74D)
+    else -> defaultColor
+}
+
+private fun tempWarningColor(temp: Float, defaultColor: Color): Color = when {
+    temp >= 48f -> Color(0xFFEF5350)
+    temp >= 42f -> Color(0xFFFFB74D)
+    else -> defaultColor
+}
+
+private fun batteryWarningColor(percent: Int, defaultColor: Color): Color = when {
+    percent <= 15 -> Color(0xFFEF5350)
+    percent <= 25 -> Color(0xFFFFB74D)
+    else -> defaultColor
+}
+
+private fun memWarningColor(usedMb: Long, totalMb: Long, defaultColor: Color): Color {
+    if (totalMb <= 0) return defaultColor
+    val pct = usedMb.toFloat() / totalMb.toFloat()
+    return when {
+        pct >= 0.90f -> Color(0xFFEF5350)
+        pct >= 0.80f -> Color(0xFFFFB74D)
+        else -> defaultColor
+    }
+}
+
+private fun collectPlaybackStats(
+    player: Player?,
+    context: Context,
+    reportedFps: Float,
+    videoDecoderName: String?,
+    audioDecoderName: String?,
+    decoderMode: DecoderMode?
+): PlaybackStats {
     var vRes = "N/A"
-    var vCodec = "N/A"
+    var vMime = "N/A"
     var vBitrate = "N/A"
     var formatFps = 0f
     var videoCount = 0
 
-    var aCodec = "N/A"
+    var aMime = "N/A"
     var aSampleRate = "N/A"
     var aChannels = "N/A"
-    var aLanguage = "N/A"
+    var aLang = "None"
+    var aLabel = "None"
     var audioCount = 0
     val audioLangs = mutableListOf<String>()
 
-    var sCodec = "None"
-    var sLanguage = "None"
+    var hasSub = false
+    var sMime = "None"
+    var sLang = "None"
     var subCount = 0
     val subLangs = mutableListOf<String>()
 
@@ -329,7 +672,7 @@ private fun collectPlaybackStats(player: Player?, context: Context, reportedFps:
                         vRes = if (format.width != Format.NO_VALUE && format.height != Format.NO_VALUE) {
                             "${format.width}x${format.height}"
                         } else "N/A"
-                        vCodec = format.sampleMimeType ?: "N/A"
+                        vMime = format.sampleMimeType ?: "N/A"
                         vBitrate = if (format.bitrate != Format.NO_VALUE) "${format.bitrate / 1000} kbps" else "N/A"
                         formatFps = if (format.frameRate != Format.NO_VALUE.toFloat() && format.frameRate > 0f) format.frameRate else 0f
                         break
@@ -340,19 +683,20 @@ private fun collectPlaybackStats(player: Player?, context: Context, reportedFps:
                 audioCount += group.length
                 for (i in 0 until group.length) {
                     val format = group.getTrackFormat(i)
-                    val lang = format.language?.takeIf { it.isNotBlank() } ?: "und"
-                    if (!audioLangs.contains(lang)) audioLangs.add(lang)
+                    val formattedLang = formatLanguage(format.language)
+                    if (!audioLangs.contains(formattedLang)) audioLangs.add(formattedLang)
                     if (group.isTrackSelected(i)) {
-                        aCodec = format.sampleMimeType ?: "N/A"
+                        aMime = format.sampleMimeType ?: "N/A"
                         aSampleRate = if (format.sampleRate != Format.NO_VALUE) "${format.sampleRate} Hz" else "N/A"
-                        aLanguage = format.language ?: "Default"
+                        aLang = formattedLang
+                        aLabel = format.label?.takeIf { it.isNotBlank() } ?: formattedLang
                         aChannels = when (format.channelCount) {
-                            1 -> "Mono (1)"
-                            2 -> "Stereo (2)"
-                            6 -> "5.1 (6)"
-                            8 -> "7.1 (8)"
+                            1 -> "Mono (1 ch)"
+                            2 -> "Stereo (2 ch)"
+                            6 -> "5.1 Surround (6 ch)"
+                            8 -> "7.1 Surround (8 ch)"
                             Format.NO_VALUE -> "N/A"
-                            else -> "${format.channelCount} ch"
+                            else -> "${format.channelCount} channels"
                         }
                     }
                 }
@@ -361,20 +705,29 @@ private fun collectPlaybackStats(player: Player?, context: Context, reportedFps:
                 subCount += group.length
                 for (i in 0 until group.length) {
                     val format = group.getTrackFormat(i)
-                    val lang = format.language?.takeIf { it.isNotBlank() } ?: "und"
-                    if (!subLangs.contains(lang)) subLangs.add(lang)
+                    val formattedLang = formatLanguage(format.language)
+                    if (!subLangs.contains(formattedLang)) subLangs.add(formattedLang)
                     if (group.isTrackSelected(i)) {
-                        sCodec = format.sampleMimeType ?: "Text"
-                        sLanguage = format.language ?: format.label ?: "Selected"
+                        hasSub = true
+                        sMime = format.sampleMimeType ?: "Text"
+                        sLang = format.label?.takeIf { it.isNotBlank() } ?: formattedLang
                     }
                 }
             }
         }
     }
 
+    val fpsStr = if (reportedFps > 0f) {
+        "%.2f fps".format(reportedFps)
+    } else if (formatFps > 0f) {
+        "%.2f fps".format(formatFps)
+    } else {
+        "N/A"
+    }
+
     val bufferPos = player?.bufferedPosition ?: 0L
     val currentPos = player?.currentPosition ?: 0L
-    val bufferHealth = "%.1f / %.1f s".format(bufferPos / 1000f, currentPos / 1000f)
+    val bufferHealth = "%.1fs (cur: %.1fs)".format(bufferPos / 1000f, currentPos / 1000f)
     val speed = player?.playbackParameters?.speed ?: 1f
 
     val display = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -386,59 +739,47 @@ private fun collectPlaybackStats(player: Player?, context: Context, reportedFps:
     val refreshRate = display?.refreshRate ?: 0f
     val screenRes = context.resources.displayMetrics.run { "${widthPixels}x${heightPixels}" }
 
-    val isNosvedInit = try { NosvedMedia.isInitialized() } catch (_: Throwable) { false }
     val ffmpegVer = try { NosvedMedia.getFFmpegVersion() } catch (_: Throwable) { "7.1" }
     val dav1dVer = try { NosvedMedia.getDav1dVersion() } catch (_: Throwable) { "1.5.0" }
-    val isSupported = try {
-        if (vCodec != "N/A") NosvedMedia.isCodecSupported(vCodec) else false
-    } catch (_: Throwable) { false }
+
+    val vDecInfo = parseVideoDecoder(videoDecoderName, vMime, decoderMode)
+    val aDecInfo = parseAudioDecoder(audioDecoderName, aMime, decoderMode)
 
     return PlaybackStats(
         videoResolution = vRes,
-        videoCodec = vCodec,
+        videoCodecMime = vMime,
+        videoCodecFriendly = friendlyVideoCodec(vMime),
         videoBitrate = vBitrate,
+        videoFramerate = fpsStr,
         videoTracksCount = videoCount,
-        audioCodec = aCodec,
+        videoDecoderInfo = vDecInfo,
+
+        audioCodecMime = aMime,
+        audioCodecFriendly = friendlyAudioCodec(aMime),
         audioSampleRate = aSampleRate,
         audioChannels = aChannels,
-        audioLanguage = aLanguage,
+        audioLanguage = aLang,
+        audioTrackLabel = aLabel,
         audioTracksCount = audioCount,
-        audioAllLanguages = if (audioLangs.isEmpty()) "None" else audioLangs.joinToString(", "),
-        subtitleCodec = sCodec,
-        subtitleLanguage = sLanguage,
+        audioOtherLanguages = audioLangs.filter { it != aLang }.joinToString(", "),
+        audioDecoderInfo = aDecInfo,
+
+        hasActiveSubtitle = hasSub,
+        subtitleCodecMime = sMime,
+        subtitleCodecFriendly = friendlySubtitleCodec(sMime),
+        subtitleLanguage = sLang,
         subtitleTracksCount = subCount,
-        subtitleAllLanguages = if (subLangs.isEmpty()) "None" else subLangs.joinToString(", "),
+        subtitleOtherLanguages = subLangs.filter { it != sLang }.joinToString(", "),
+
         bufferHealth = bufferHealth,
         playbackSpeed = "%.2fx".format(speed),
         displayRefreshRate = if (refreshRate > 0f) "%.1f Hz".format(refreshRate) else "N/A",
         screenResolution = screenRes,
-        reportedFps = reportedFps,
-        formatFps = formatFps,
+
         nosvedVersion = "1.0.0",
         ffmpegVersion = ffmpegVer,
-        dav1dVersion = dav1dVer,
-        isNosvedInitialized = isNosvedInit,
-        isCodecSupportedByNosved = isSupported
+        dav1dVersion = dav1dVer
     )
-}
-
-private fun levelColor(level: Float): Color = when {
-    level < 0.5f -> Color(0xFF4CAF50)
-    level < 0.75f -> Color(0xFFFF9800)
-    else -> Color(0xFFF44336)
-}
-
-private fun tempColor(temp: Float): Color = when {
-    temp <= 0f -> Color.White
-    temp < 40f -> Color(0xFF4CAF50)
-    temp < 50f -> Color(0xFFFF9800)
-    else -> Color(0xFFF44336)
-}
-
-private fun batteryColor(percent: Int): Color = when {
-    percent > 50 -> Color(0xFF4CAF50)
-    percent > 20 -> Color(0xFFFF9800)
-    else -> Color(0xFFF44336)
 }
 
 private fun collectStats(context: Context, videoFps: Float): DeviceStats {

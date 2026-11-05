@@ -106,6 +106,7 @@ fun VideoScreen(
     val bufferedPosition by (viewModel.bufferedPosition ?: kotlinx.coroutines.flow.flowOf(0L)).collectAsState(initial = 0L)
     val videoFps by (viewModel.videoFps ?: kotlinx.coroutines.flow.flowOf(0f)).collectAsState(initial = 0f)
     val videoDecoderName by (viewModel.videoDecoderName ?: kotlinx.coroutines.flow.flowOf(null)).collectAsState(initial = null)
+    val audioDecoderName by (viewModel.audioDecoderName ?: kotlinx.coroutines.flow.flowOf(null)).collectAsState(initial = null)
 
     val controlsVisible by viewModel.controlsVisible.collectAsState()
     val currentVideo by viewModel.currentVideo.collectAsState()
@@ -608,12 +609,14 @@ fun VideoScreen(
             verticalOffsetFraction = subtitleVerticalOffset
         )
 
-        //  Device stats overlay 
+        // Device stats overlay
         DeviceStatsOverlay(
             visible = showStats || playbackSettings.showStatsOverlay,
             player = player,
             videoFps = videoFps,
             videoDecoderName = videoDecoderName,
+            audioDecoderName = audioDecoderName,
+            decoderMode = currentDecoder,
             onDismiss = {
                 viewModel.setShowStats(false)
                 settingsViewModel.updateShowStatsOverlay(false)

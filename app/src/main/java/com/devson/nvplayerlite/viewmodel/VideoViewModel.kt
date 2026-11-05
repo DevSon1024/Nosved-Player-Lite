@@ -54,6 +54,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     val isPortraitVideo get() = playerManager?.isPortraitVideo
     val videoFps get() = playerManager?.videoFps
     val videoDecoderName get() = playerManager?.videoDecoderName
+    val audioDecoderName get() = playerManager?.audioDecoderName
 
     // --- Audio & Subtitle Tracks from Manager ---
     val audioTracks get() = playerManager?.audioTracks
