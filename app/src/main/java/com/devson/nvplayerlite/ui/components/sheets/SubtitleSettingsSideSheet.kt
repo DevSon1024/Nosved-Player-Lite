@@ -358,10 +358,7 @@ private fun TracksTab(
         } else {
             subtitleTracks.forEach { track ->
                 TrackCardItem(
-                    title = track.name,
-                    isSelected = track.selected,
-                    isExternal = track.isExternal,
-                    isNone = track.id == -1,
+                    track = track,
                     onClick = { onSelectSubtitleTrack(track.id) }
                 )
             }
@@ -371,12 +368,13 @@ private fun TracksTab(
 
 @Composable
 private fun TrackCardItem(
-    title: String,
-    isSelected: Boolean,
-    isExternal: Boolean,
-    isNone: Boolean,
+    track: TrackInfo,
     onClick: () -> Unit
 ) {
+    val isSelected = track.selected
+    val isNone = track.id == -1
+    val isExternal = track.isExternal
+
     val containerColor = if (isSelected) {
         MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
     } else {
@@ -398,7 +396,7 @@ private fun TrackCardItem(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(horizontal = 14.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
@@ -415,17 +413,56 @@ private fun TrackCardItem(
                     )
                 )
 
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                    color = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = track.displayName,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+
+                        if (!track.originalLanguageName.isNullOrBlank() && !isNone) {
+                            Surface(
+                                color = if (isSelected) {
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                                } else {
+                                    MaterialTheme.colorScheme.surfaceContainerHighest
+                                },
+                                shape = RoundedCornerShape(6.dp)
+                            ) {
+                                Text(
+                                    text = track.originalLanguageName,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    if (!track.trackDetails.isNullOrBlank() && !isNone) {
+                        Text(
+                            text = track.trackDetails,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                        )
+                    }
+                }
             }
 
             if (!isNone) {
+                Spacer(Modifier.width(8.dp))
                 Surface(
                     color = if (isExternal) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.secondaryContainer,
                     contentColor = if (isExternal) MaterialTheme.colorScheme.onTertiaryContainer else MaterialTheme.colorScheme.onSecondaryContainer,
