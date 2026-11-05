@@ -36,5 +36,8 @@ data class PlayerSettingsActions(
     val onUpdateSaveBrightnessLevel: (Boolean) -> Unit = {},
     val onUpdateIsBottomLayoutEnabled: (Boolean) -> Unit = {},
     val onUpdateShowControlGradients: (Boolean) -> Unit = {},
-    val onUpdateBackgroundPlayEnabled: (Boolean) -> Unit = {}
+    val onUpdateBackgroundPlayEnabled: (Boolean) -> Unit = {},
+    val onUpdateShowStatsOverlay: (Boolean) -> Unit = {},
+    val onUpdateShowElapsedTimeOverlay: (Boolean) -> Unit = {},
+    val onUpdateShowScreenRotationButton: (Boolean) -> Unit = {}
 )

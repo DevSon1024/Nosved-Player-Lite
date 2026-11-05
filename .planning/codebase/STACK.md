@@ -13,7 +13,7 @@ Detailed breakdown of the technology stack and core dependencies.
 ## Media & Playback
 
 - **Media Engine**: Jetpack Media3 (ExoPlayer) 1.5.1
-- **Extensions**: `nextlib-media3ext`, `nextlib-mediainfo` (Anil Beesetti)
+- **Extensions**: `com.devson.nosvedmedia:nosved-media3:1.0.0` (FFmpeg 7.1 + dav1d 1.5.0)
 - **Features**: Quality selection, Subtitles, Gesture-based controls.
 
 ## Data & Persistence

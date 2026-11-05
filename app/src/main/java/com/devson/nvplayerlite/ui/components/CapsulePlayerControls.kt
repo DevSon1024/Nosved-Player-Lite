@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
+import android.net.Uri
 import android.os.BatteryManager
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
@@ -165,6 +166,7 @@ fun CapsulePlayerControls(
     bufferedPositionProvider: (() -> Long)? = null,
     isNetworkStream: Boolean = false,
     duration: Long,
+    videoUri: Uri? = null,
     isDragging: Boolean = false,
     onDraggingChanged: (Boolean) -> Unit = {},
     onPlayPauseToggle: () -> Unit,
@@ -510,6 +512,7 @@ fun CapsulePlayerControls(
                     .navigationBarsPadding()
                     .padding(start = 16.dp, end = 16.dp, bottom = 20.dp)
             ) {
+
                 // Balanced Timestamp Row Above Seekbar
                 Row(
                     modifier = Modifier
@@ -721,6 +724,7 @@ fun CapsulePlayerControls(
 
                     Spacer(modifier = Modifier.height(if (isCompactLandscape) (sizeSpec.dockToTimelineSpacing - 2.dp).coerceAtLeast(6.dp) else sizeSpec.dockToTimelineSpacing))
                 }
+
 
                 // 2. Single Horizontal Timeline Row
                 Row(

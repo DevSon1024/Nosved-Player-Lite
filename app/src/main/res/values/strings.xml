@@ -87,7 +87,7 @@
 
     <!-- Libraries Descriptions -->
     <string name="about_lib_exoplayer_desc">The powerhouse behind all video &amp; audio playback.</string>
-    <string name="about_lib_nextlib_desc">Nextlib is a powerful media player library for Android that provides advanced features such as hardware acceleration, custom codecs, and more.</string>
+    <string name="about_lib_nosvedmedia_desc">High-performance software video decoder extension for Media3 built with FFmpeg 7.1 and dav1d 1.5.0.</string>
     <string name="about_lib_compose_desc">Modern declarative UI toolkit for Android.</string>
     <string name="about_lib_material3_desc">Google\'s latest design system components.</string>
     <string name="about_lib_room_desc">SQLite abstraction library for watch history storage.</string>

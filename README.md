@@ -103,7 +103,7 @@
 
 > > ### Performance & Compatibility
 
-- Powered by **Google Media3 / ExoPlayer** with integrated **FFmpeg** decoders (via Nextlib) for broad format support.
+- Powered by **Google Media3 / ExoPlayer** with integrated **FFmpeg** decoders (via NosvedMedia) for broad format support.
 - Fast thumbnails using a custom **MediaStore-optimised Coil** integration.
 - **Subtitle support** - internal & external tracks (SRT, ASS, VTT, etc.).
 - **Gesture controls** - swipe for brightness, volume, seek, and aspect-ratio switching.
@@ -117,7 +117,7 @@
 | **UI Framework**    | [Jetpack Compose](https://developer.android.com/jetpack/compose)                                                                                     |
 | **Design System**   | Material 3 (Material You)                                                                                                                            |
 | **Playback Engine** | [Android Media3 / ExoPlayer](https://github.com/androidx/media)                                                                                      |
-| **Native Decoders** | FFmpeg via [Nextlib](https://github.com/anilbeesetti/nextlib)                                                                                        |
+| **Native Decoders** | FFmpeg via NosvedMedia (FFmpeg 7.1 + dav1d 1.5.0)                                                                                        |
 | **Image Loading**   | [Coil](https://github.com/coil-kt/coil) (VideoFrame + MediaStore fetchers)                                                                           |
 | **Persistence**     | [Room](https://developer.android.com/training/data-storage/room) + [DataStore](https://developer.android.com/topic/libraries/architecture/datastore) |
 | **Architecture**    | MVVM + Kotlin Coroutines + StateFlow                                                                                                                 |

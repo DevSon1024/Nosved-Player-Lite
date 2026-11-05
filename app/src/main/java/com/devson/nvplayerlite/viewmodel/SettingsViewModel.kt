@@ -166,6 +166,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 softButtonMode = com.devson.nvplayerlite.repository.SoftButtonMode.AUTO_HIDE,
                 showElapsedTimeOverlay = false,
                 showBatteryClockOverlay = false,
+                showStatsOverlay = false,
                 showScreenRotationButton = true,
                 pauseWhenObstructed = true,
                 showRemainingTime = false,
@@ -206,6 +207,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     fun updateShowBatteryClockOverlay(show: Boolean) {
         viewModelScope.launch { settingsRepo.updateShowBatteryClockOverlay(show) }
+    }
+
+    fun updateShowStatsOverlay(show: Boolean) {
+        viewModelScope.launch { settingsRepo.updateShowStatsOverlay(show) }
     }
 
     fun updateShowScreenRotationButton(show: Boolean) {

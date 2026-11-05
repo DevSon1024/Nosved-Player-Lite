@@ -1,6 +1,6 @@
 # =============================================================================
 # Nosved Player Lite Lite - ProGuard / R8 Rules
-# Target: Media3 1.11.0 + Kotlinx Serialization + Nextlib
+# Target: Media3 1.11.0 + Kotlinx Serialization + NosvedMedia
 # =============================================================================
 
 #  Debug info (uncomment for crash-readable stack traces) 
@@ -24,9 +24,8 @@
 # MediaCodec selector implementations (looked up by class name)
 -keep class androidx.media3.exoplayer.mediacodec.** { *; }
 
-# DefaultRenderersFactory / NextRenderersFactory extension discovery
+# DefaultRenderersFactory extension discovery
 -keepnames class androidx.media3.exoplayer.DefaultRenderersFactory
--keepnames class io.github.anilbeesetti.nextlib.media3ext.ffdecoder.NextRenderersFactory
 
 # MediaSession (notification controls + media button handling)
 -keep class androidx.media3.session.** { *; }
@@ -83,14 +82,14 @@
 -keep class com.devson.nvplayerlite.navigation.** { *; }
 
 # =============================================================================
-# 3. Nextlib (io.github.anilbeesetti.nextlib)
+# 3. NosvedMedia (com.devson.nosvedmedia)
 # =============================================================================
 
--keep class io.github.anilbeesetti.nextlib.** { *; }
--dontwarn io.github.anilbeesetti.nextlib.**
+-keep class com.devson.nosvedmedia.** { *; }
+-dontwarn com.devson.nosvedmedia.**
 
 # =============================================================================
-# 5. Room Database
+# 4. Room Database
 # =============================================================================
 
 -keep class * extends androidx.room.RoomDatabase
@@ -98,7 +97,7 @@
 -dontwarn androidx.room.**
 
 # =============================================================================
-# 6. Kotlin Coroutines & StateFlow
+# 5. Kotlin Coroutines & StateFlow
 # =============================================================================
 
 -keepnames class kotlinx.coroutines.internal.MainDispatcherFactory {}
@@ -108,7 +107,7 @@
 }
 
 # =============================================================================
-# 7. Compose + Lifecycle
+# 6. Compose + Lifecycle
 # =============================================================================
 
 -keep class androidx.compose.** { *; }
@@ -117,7 +116,7 @@
 -dontwarn androidx.lifecycle.**
 
 # =============================================================================
-# 8. General Android
+# 7. General Android
 # =============================================================================
 
 # Parcelables (used by navigation argument bundles)

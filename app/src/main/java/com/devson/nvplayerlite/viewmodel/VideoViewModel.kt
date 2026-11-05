@@ -54,6 +54,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     val isPortraitVideo get() = playerManager?.isPortraitVideo
     val videoFps get() = playerManager?.videoFps
     val videoDecoderName get() = playerManager?.videoDecoderName
+    val audioDecoderName get() = playerManager?.audioDecoderName
 
     // --- Audio & Subtitle Tracks from Manager ---
     val audioTracks get() = playerManager?.audioTracks
@@ -210,6 +211,9 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
             playerManager?.onPlaybackError = {
                 playNextVideo()
             }
+            playerManager?.onDecoderFallback = { fallbackMode ->
+                setDecoderMode(fallbackMode)
+            }
 
             pendingVideo?.let { video ->
                 val resumeMs = pendingResumeMs
@@ -218,10 +222,9 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                 _currentPlaylist.value = playlist
                 _currentPlaylistIndex.value = playlist.indexOfFirst { it.uri == video.uri }
 
-                playerManager?.playVideo(video)
                 val dur = video.duration
                 val startPos = if (dur > 0 && resumeMs >= dur * 0.95f) 0L else resumeMs
-                if (startPos > 0L) playerManager?.seekTo(startPos)
+                playerManager?.playVideo(video, startPos)
                 _controlsVisible.value = false
                 pendingVideo = null
                 pendingPlaylist = emptyList()
@@ -246,13 +249,17 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
             _currentDecoderMode.value = mode
             val video = _currentVideo.value ?: return@launch
             val (savedPos, wasPlaying) = playerManager?.releasePlayerAndKeepState() ?: return@launch
-            _playerInstance.value = null
+            val posToRestore = if (savedPos > 0L) savedPos else historyRepo.getPosition(video.uri)
+
             playerManager = PlayerManager(getApplication())
             playerManager?.initializePlayer(
                 mode,
                 _defaultAudioLang.value,
                 _defaultSubtitleLang.value
             )
+            playerManager?.onDecoderFallback = { fallbackMode ->
+                setDecoderMode(fallbackMode)
+            }
             _playerInstance.value = playerManager?.exoPlayer
             viewModelScope.launch {
                 playerManager?.isPlaying?.collect { playing ->
@@ -270,9 +277,10 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                 if (_autoPlayEnabled.value) playNextVideo()
             }
             playerManager?.onPlaybackError = { playNextVideo() }
-            playerManager?.playVideo(video)
-            if (savedPos > 0L) playerManager?.seekTo(savedPos)
-            if (!wasPlaying) playerManager?.pause()
+            playerManager?.playVideo(video, posToRestore)
+            if (!wasPlaying) {
+                playerManager?.pause()
+            }
         }
     }
 
@@ -287,17 +295,24 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         _currentPlaylist.value = actualPlaylist
         _currentPlaylistIndex.value = actualPlaylist.indexOfFirst { it.uri == video.uri }
 
-        viewModelScope.launch { historyRepo.recordPlay(video) }
-        if (playerManager != null) {
-            playerManager?.playVideo(video)
+        viewModelScope.launch {
+            historyRepo.recordPlay(video)
+            val effectiveResume = if (resumePositionMs > 0L) {
+                resumePositionMs
+            } else {
+                historyRepo.getPosition(video.uri).takeIf { it > 0L } ?: (video.playedTime ?: 0L)
+            }
             val dur = video.duration
-            val startPos = if (dur > 0 && resumePositionMs >= dur * 0.95f) 0L else resumePositionMs
-            if (startPos > 0L) playerManager?.seekTo(startPos)
-            _controlsVisible.value = false
-        } else {
-            pendingVideo = video
-            pendingPlaylist = actualPlaylist
-            pendingResumeMs = resumePositionMs
+            val startPos = if (dur > 0 && effectiveResume >= dur * 0.95f) 0L else effectiveResume
+
+            if (playerManager != null) {
+                playerManager?.playVideo(video, startPos)
+                _controlsVisible.value = false
+            } else {
+                pendingVideo = video
+                pendingPlaylist = actualPlaylist
+                pendingResumeMs = startPos
+            }
         }
     }
 
@@ -379,6 +394,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private var wasPlayingBeforeSeek = false
+    private var lastSmoothSeekMs = 0L
 
     fun beginSeek() {
         val player = playerManager?.exoPlayer ?: return
@@ -386,6 +402,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
             _isSeeking.value = true
             wasPlayingBeforeSeek = player.isPlaying
             _seekPreviewPosition.value = (playerManager?.currentPosition?.value ?: player.currentPosition).coerceAtLeast(0L)
+            playerManager?.setScrubbingMode(true)
             playerManager?.pause()
         }
     }
@@ -395,12 +412,20 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
             beginSeek()
         }
         val duration = (playerManager?.duration?.value ?: playerManager?.exoPlayer?.duration ?: 0L).coerceAtLeast(0L)
-        _seekPreviewPosition.value = positionMs.coerceIn(0L, if (duration > 0L) duration else Long.MAX_VALUE)
+        val target = positionMs.coerceIn(0L, if (duration > 0L) duration else Long.MAX_VALUE)
+        _seekPreviewPosition.value = target
+
+        val now = System.currentTimeMillis()
+        if (now - lastSmoothSeekMs >= 60L) {
+            lastSmoothSeekMs = now
+            playerManager?.seekSmooth(target)
+        }
     }
 
-    fun commitSeek() {
-        val target = _seekPreviewPosition.value
+    fun commitSeek(targetPos: Long? = null) {
+        val target = targetPos ?: _seekPreviewPosition.value
         _isSeeking.value = false
+        playerManager?.setScrubbingMode(false)
         playerManager?.seekTo(target)
         if (wasPlayingBeforeSeek && _currentVideo.value != null) {
             playerManager?.resume()
@@ -556,9 +581,19 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun startProgressUpdate() {
         viewModelScope.launch {
+            var saveCounter = 0
             while (true) {
                 if (!_isSeeking.value) {
                     playerManager?.updateProgress()
+                    saveCounter++
+                    if (saveCounter >= 20) {
+                        saveCounter = 0
+                        val uri = _currentVideo.value?.uri
+                        val pos = resolvePositionToSave()
+                        if (uri != null && pos > 0L) {
+                            historyRepo.savePosition(uri, pos)
+                        }
+                    }
                 }
                 delay(250)
             }

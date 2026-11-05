@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Context
 import android.content.pm.ActivityInfo
 import android.media.AudioManager
+import android.net.Uri
 import android.os.Build
 import android.view.WindowManager
 import android.widget.Toast
@@ -105,9 +106,11 @@ fun VideoScreen(
     val bufferedPosition by (viewModel.bufferedPosition ?: kotlinx.coroutines.flow.flowOf(0L)).collectAsState(initial = 0L)
     val videoFps by (viewModel.videoFps ?: kotlinx.coroutines.flow.flowOf(0f)).collectAsState(initial = 0f)
     val videoDecoderName by (viewModel.videoDecoderName ?: kotlinx.coroutines.flow.flowOf(null)).collectAsState(initial = null)
+    val audioDecoderName by (viewModel.audioDecoderName ?: kotlinx.coroutines.flow.flowOf(null)).collectAsState(initial = null)
 
     val controlsVisible by viewModel.controlsVisible.collectAsState()
     val currentVideo by viewModel.currentVideo.collectAsState()
+    val videoUri = remember(currentVideo?.uri) { currentVideo?.uri?.let { Uri.parse(it) } }
     val isPortrait by viewModel.isPortraitVideo?.collectAsState(initial = null)
         ?: remember { mutableStateOf<Boolean?>(null) }
 
@@ -256,7 +259,10 @@ fun VideoScreen(
             onUpdateSaveBrightnessLevel = { settingsViewModel.updateSaveBrightnessLevel(it) },
             onUpdateIsBottomLayoutEnabled = { settingsViewModel.updateIsBottomLayoutEnabled(it) },
             onUpdateShowControlGradients = { settingsViewModel.updateShowControlGradients(it) },
-            onUpdateBackgroundPlayEnabled = { settingsViewModel.updateBackgroundPlayEnabled(it) }
+            onUpdateBackgroundPlayEnabled = { settingsViewModel.updateBackgroundPlayEnabled(it) },
+            onUpdateShowStatsOverlay = { settingsViewModel.updateShowStatsOverlay(it) },
+            onUpdateShowElapsedTimeOverlay = { settingsViewModel.updateShowElapsedTimeOverlay(it) },
+            onUpdateShowScreenRotationButton = { settingsViewModel.updateShowScreenRotationButton(it) }
         )
     }
 
@@ -357,10 +363,14 @@ fun VideoScreen(
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner, pauseWhenObstructed) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
-            if (pauseWhenObstructed && event == androidx.lifecycle.Lifecycle.Event.ON_PAUSE) {
-                if (player?.isPlaying == true) {
-                    player?.pause()
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_PAUSE) {
+                if (pauseWhenObstructed && player?.isPlaying == true) {
+                    viewModel.pauseVideo()
+                } else {
+                    viewModel.pauseVideo()
                 }
+            } else if (event == androidx.lifecycle.Lifecycle.Event.ON_STOP) {
+                viewModel.pauseVideo()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -599,13 +609,18 @@ fun VideoScreen(
             verticalOffsetFraction = subtitleVerticalOffset
         )
 
-        //  Device stats overlay 
+        // Device stats overlay
         DeviceStatsOverlay(
-            visible = showStats,
+            visible = showStats || playbackSettings.showStatsOverlay,
             player = player,
             videoFps = videoFps,
             videoDecoderName = videoDecoderName,
-            onDismiss = { viewModel.setShowStats(false) },
+            audioDecoderName = audioDecoderName,
+            decoderMode = currentDecoder,
+            onDismiss = {
+                viewModel.setShowStats(false)
+                settingsViewModel.updateShowStatsOverlay(false)
+            },
             modifier = Modifier
                 .align(Alignment.TopStart)
                 .padding(top = 16.dp, start = 16.dp)
@@ -671,13 +686,15 @@ fun VideoScreen(
                     bufferedPosition = bufferedPosition,
                     bufferedPositionProvider = { bufferedPosition },
                     duration = duration,
+                    videoUri = videoUri,
                     onPlayPauseToggle = {
                         viewModel.togglePlayPause()
                         viewModel.showControlsAndDelayHide()
                     },
                     onSeek = { targetPos, isFinished ->
                         if (isFinished) {
-                            viewModel.commitSeek()
+                            viewModel.updateSeekPreview(targetPos)
+                            viewModel.commitSeek(targetPos)
                         } else {
                             viewModel.updateSeekPreview(targetPos)
                         }
@@ -788,6 +805,7 @@ fun VideoScreen(
                 title = currentVideo?.title ?: "",
                 currentPosition = displayedPosition,
                 duration = duration,
+                videoUri = videoUri,
                 showStats = showStats,
                 hasPrevious = hasPrevious,
                 hasNext = hasNext,
@@ -830,6 +848,8 @@ fun VideoScreen(
                 onFastplaySpeedChange = { viewModel.setFastplaySpeed(it) },
                 useModernStyle = useModernStyle,
                 onModernStyleChange = { settingsViewModel.setModernPlayerStyle(it) },
+                playbackSettings = playbackSettings,
+                playerSettingsActions = playerSettingsActions,
                 onInfoClick = {
                     showInfoSheet = true
                     viewModel.showControlsAndDelayHide()

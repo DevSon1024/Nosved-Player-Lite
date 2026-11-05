@@ -12,12 +12,14 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import com.devson.nvplayerlite.model.TrackInfo
+import com.devson.nvplayerlite.model.LanguageList
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.MediaItem.SubtitleConfiguration
 import android.net.Uri
 import androidx.media3.common.util.UnstableApi
 import androidx.annotation.OptIn
-import io.github.anilbeesetti.nextlib.media3ext.ffdecoder.NextRenderersFactory
+import com.nosved.nosvedmedia.NosvedMedia
+import com.nosved.nosvedmedia.media3.FFmpegRenderersFactory
 import androidx.media3.exoplayer.upstream.Loader
 import android.media.audiofx.LoudnessEnhancer
 import com.devson.nvplayerlite.util.AppLogger
@@ -35,7 +37,7 @@ import android.os.Handler
 import androidx.media3.common.MimeTypes
 
 @OptIn(UnstableApi::class)
-class HDRFallbackRenderersFactory(context: Context) : NextRenderersFactory(context) {
+class HDRFallbackRenderersFactory(context: Context) : FFmpegRenderersFactory(context) {
     override fun buildVideoRenderers(
         context: Context,
         extensionRendererMode: Int,
@@ -95,6 +97,11 @@ class PlayerManager(private val context: Context) {
 
     var onPlayPrevious: (() -> Unit)? = null
 
+    var onDecoderFallback: ((DecoderMode) -> Unit)? = null
+
+    var currentDecoderMode: DecoderMode = DecoderMode.HW_PLUS
+        private set
+
     private val _isPlaying = MutableStateFlow(false)
     val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
 
@@ -117,6 +124,9 @@ class PlayerManager(private val context: Context) {
 
     private val _videoDecoderName = MutableStateFlow<String?>(null)
     val videoDecoderName: StateFlow<String?> = _videoDecoderName.asStateFlow()
+
+    private val _audioDecoderName = MutableStateFlow<String?>(null)
+    val audioDecoderName: StateFlow<String?> = _audioDecoderName.asStateFlow()
 
     private val _playerError = MutableStateFlow<String?>(null)
     val playerError: StateFlow<String?> = _playerError.asStateFlow()
@@ -144,29 +154,45 @@ class PlayerManager(private val context: Context) {
 
     private var loudnessEnhancer: LoudnessEnhancer? = null
 
+    var preferredAudioLang: String = ""
+        private set
+    var preferredSubtitleLang: String = ""
+        private set
+    private var hasAutoSelectedTracksForCurrentMedia = false
+    private var currentExternalSubtitleUri: Uri? = null
+
     fun initializePlayer(
         decoderMode: DecoderMode = DecoderMode.HW_PLUS,
         defaultAudioLang: String = "",
         defaultSubtitleLang: String = ""
     ) {
+        currentDecoderMode = decoderMode
+        preferredAudioLang = defaultAudioLang
+        preferredSubtitleLang = defaultSubtitleLang
         if (exoPlayer == null) {
+            NosvedMedia.initialize(context)
             val extensionMode = when (decoderMode) {
                 DecoderMode.HW      -> androidx.media3.exoplayer.DefaultRenderersFactory.EXTENSION_RENDERER_MODE_OFF
                 DecoderMode.HW_PLUS -> androidx.media3.exoplayer.DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON
                 DecoderMode.SW      -> androidx.media3.exoplayer.DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER
             }
-            val renderersFactory = HDRFallbackRenderersFactory(context)
-                .setExtensionRendererMode(extensionMode)
-                .setEnableDecoderFallback(true)
-                .forceDisableMediaCodecAsynchronousQueueing()
+            val renderersFactory = HDRFallbackRenderersFactory(context).apply {
+                setExtensionRendererMode(extensionMode)
+                setEnableDecoderFallback(true)
+                forceDisableMediaCodecAsynchronousQueueing()
+                if (decoderMode == DecoderMode.SW) {
+                    setSoftwareDecoderPriority(com.nosved.nosvedmedia.media3.SoftwareDecoderPriority.PREFER)
+                }
+            }
 
             val loadControl = DefaultLoadControl.Builder()
                 .setBufferDurationsMs(
                     DefaultLoadControl.DEFAULT_MIN_BUFFER_MS,
                     DefaultLoadControl.DEFAULT_MAX_BUFFER_MS,
-                    500,
-                    1000
+                    1500,
+                    2500
                 )
+                .setPrioritizeTimeOverSizeThresholds(true)
                 .build()
 
             val audioAttributes = AudioAttributes.Builder()
@@ -212,9 +238,14 @@ class PlayerManager(private val context: Context) {
                             }
                         }
 
+                        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                            super.onMediaItemTransition(mediaItem, reason)
+                            hasAutoSelectedTracksForCurrentMedia = false
+                            currentExternalSubtitleUri = null
+                        }
+
                         override fun onTracksChanged(tracks: androidx.media3.common.Tracks) {
                             super.onTracksChanged(tracks)
-                            // Keep all your existing audio/subtitle track parsing logic here exactly as it is...
 
                             val newAudioTracks = mutableListOf<TrackInfo>()
                             val newSubtitleTracks = mutableListOf<TrackInfo>()
@@ -224,15 +255,39 @@ class PlayerManager(private val context: Context) {
                             val audioGroupCount = tracks.groups.count { it.type == androidx.media3.common.C.TRACK_TYPE_AUDIO }
                             val subtitleGroupCount = tracks.groups.count { it.type == androidx.media3.common.C.TRACK_TYPE_TEXT }
 
-                            fun parseLanguageDisplay(lang: String?): String? {
-                                if (lang.isNullOrBlank() || lang == "und") return null
-                                return try {
-                                    val loc = java.util.Locale(lang)
-                                    val disp = loc.displayLanguage
-                                    if (disp.isNotBlank()) disp.replaceFirstChar { if (it.isLowerCase()) it.titlecase(loc) else it.toString() } else lang
-                                } catch (_: Exception) {
-                                    lang
-                                }
+                            fun getAudioCodecDescription(mime: String?): String = when {
+                                mime == null -> ""
+                                mime.contains("eac3", ignoreCase = true) || mime.contains("e-ac3", ignoreCase = true) -> "Dolby Digital Plus"
+                                mime.contains("ac3", ignoreCase = true) || mime.contains("ac-3", ignoreCase = true) -> "Dolby Digital"
+                                mime.contains("dts-hd", ignoreCase = true) -> "DTS-HD"
+                                mime.contains("dts", ignoreCase = true) -> "DTS"
+                                mime.contains("truehd", ignoreCase = true) -> "Dolby TrueHD"
+                                mime.contains("mp4a", ignoreCase = true) || mime.contains("aac", ignoreCase = true) -> "AAC"
+                                mime.contains("opus", ignoreCase = true) -> "Opus"
+                                mime.contains("vorbis", ignoreCase = true) -> "Vorbis"
+                                mime.contains("flac", ignoreCase = true) -> "FLAC"
+                                mime.contains("pcm", ignoreCase = true) || mime.contains("raw", ignoreCase = true) -> "PCM"
+                                mime.contains("mpeg", ignoreCase = true) || mime.contains("mp3", ignoreCase = true) -> "MP3"
+                                else -> mime.substringAfterLast("/").uppercase()
+                            }
+
+                            fun getChannelLayoutDescription(channels: Int): String = when (channels) {
+                                1 -> "Mono (1.0)"
+                                2 -> "Stereo (2.0)"
+                                6 -> "5.1 Surround"
+                                8 -> "7.1 Surround"
+                                else -> if (channels > 0) "$channels Ch" else ""
+                            }
+
+                            fun getSubtitleFormatDescription(mime: String?): String = when {
+                                mime == null -> ""
+                                mime.contains("subrip", ignoreCase = true) || mime.contains("srt", ignoreCase = true) -> "SubRip (SRT)"
+                                mime.contains("x-ssa", ignoreCase = true) || mime.contains("x-ass", ignoreCase = true) || mime.contains("ssa", ignoreCase = true) || mime.contains("ass", ignoreCase = true) -> "ASS/SSA"
+                                mime.contains("vtt", ignoreCase = true) -> "WebVTT"
+                                mime.contains("pgs", ignoreCase = true) -> "PGS"
+                                mime.contains("ttml", ignoreCase = true) -> "TTML"
+                                mime.contains("dvbsub", ignoreCase = true) -> "DVB Subtitle"
+                                else -> mime.substringAfterLast("/").uppercase()
                             }
 
                             for (group in tracks.groups) {
@@ -244,40 +299,62 @@ class PlayerManager(private val context: Context) {
                                 } else if (group.type == androidx.media3.common.C.TRACK_TYPE_AUDIO) {
                                     val format = group.getTrackFormat(0)
                                     val trackIndex = newAudioTracks.size
-                                    val langName = parseLanguageDisplay(format.language)
+                                    val langDisplayName = LanguageList.getDisplayName(format.language)
+                                    val nativeLangName = LanguageList.getNativeName(format.language)
+
                                     val label = format.label?.takeIf { it.isNotBlank() }
                                         ?: if (audioGroupCount == 1) {
-                                            langName ?: "Default Audio"
+                                            if (langDisplayName != "Default") langDisplayName else "Default Audio"
                                         } else {
-                                            "Track ${trackIndex + 1}" + (if (langName != null) " ($langName)" else "")
+                                            if (langDisplayName != "Default") langDisplayName else "Track ${trackIndex + 1}"
                                         }
+
+                                    val channelText = getChannelLayoutDescription(format.channelCount)
+                                    val codecText = getAudioCodecDescription(format.sampleMimeType)
+                                    val details = listOfNotNull(channelText.takeIf { it.isNotBlank() }, codecText.takeIf { it.isNotBlank() }).joinToString(" • ")
+
                                     newAudioTracks.add(
                                         TrackInfo(
                                             index = trackIndex,
                                             label = label,
                                             language = format.language,
                                             selected = group.isSelected,
-                                            codec = format.sampleMimeType
+                                            codec = format.sampleMimeType,
+                                            isExternal = false,
+                                            displayName = label,
+                                            originalLanguageName = nativeLangName,
+                                            trackDetails = details.ifBlank { null }
                                         )
                                     )
                                     if (group.isSelected) currentAudioIdx = trackIndex
                                 } else if (group.type == androidx.media3.common.C.TRACK_TYPE_TEXT) {
                                     val format = group.getTrackFormat(0)
                                     val trackIndex = newSubtitleTracks.size
-                                    val langName = parseLanguageDisplay(format.language)
+                                    val langDisplayName = LanguageList.getDisplayName(format.language)
+                                    val nativeLangName = LanguageList.getNativeName(format.language)
+
                                     val label = format.label?.takeIf { it.isNotBlank() }
                                         ?: if (subtitleGroupCount == 1) {
-                                            langName ?: "Default Subtitle"
+                                            if (langDisplayName != "Default") langDisplayName else "Default Subtitle"
                                         } else {
-                                            "Track ${trackIndex + 1}" + (if (langName != null) " ($langName)" else "")
+                                            if (langDisplayName != "Default") langDisplayName else "Track ${trackIndex + 1}"
                                         }
+
+                                    val formatText = getSubtitleFormatDescription(format.sampleMimeType)
+                                    val isExt = (currentExternalSubtitleUri != null && trackIndex == subtitleGroupCount - 1) ||
+                                        (format.id?.startsWith("content://") == true || format.id?.startsWith("file://") == true)
+
                                     newSubtitleTracks.add(
                                         TrackInfo(
                                             index = trackIndex,
                                             label = label,
                                             language = format.language,
                                             selected = group.isSelected,
-                                            codec = format.sampleMimeType
+                                            codec = format.sampleMimeType,
+                                            isExternal = isExt,
+                                            displayName = label,
+                                            originalLanguageName = nativeLangName,
+                                            trackDetails = formatText.ifBlank { null }
                                         )
                                     )
                                     if (group.isSelected) currentSubIdx = trackIndex
@@ -286,12 +363,58 @@ class PlayerManager(private val context: Context) {
 
                             // Prepend "None (Off)" for subtitles
                             val isNoneSelected = (currentSubIdx == -1)
-                            newSubtitleTracks.add(0, TrackInfo(index = -1, label = "None (Off)", language = null, selected = isNoneSelected))
+                            newSubtitleTracks.add(
+                                0,
+                                TrackInfo(
+                                    index = -1,
+                                    label = "None (Off)",
+                                    language = null,
+                                    selected = isNoneSelected,
+                                    displayName = "None (Off)"
+                                )
+                            )
 
-                            _audioTracks.value = newAudioTracks
+                            // Automatic preferred language selection for newly loaded media
+                            if (!hasAutoSelectedTracksForCurrentMedia && (newAudioTracks.isNotEmpty() || newSubtitleTracks.size > 1)) {
+                                hasAutoSelectedTracksForCurrentMedia = true
+
+                                // Preferred Audio
+                                if (preferredAudioLang.isNotBlank() && newAudioTracks.isNotEmpty()) {
+                                    val matchedAudio = newAudioTracks.find { LanguageList.isMatch(it.language, it.label, preferredAudioLang) }
+                                    if (matchedAudio != null && matchedAudio.id != currentAudioIdx) {
+                                        selectAudioTrack(matchedAudio.id)
+                                        currentAudioIdx = matchedAudio.id
+                                    }
+                                }
+
+                                // Preferred Subtitle
+                                if (preferredSubtitleLang.isNotBlank()) {
+                                    val matchedSub = newSubtitleTracks.find { it.id != -1 && LanguageList.isMatch(it.language, it.label, preferredSubtitleLang) }
+                                    if (matchedSub != null) {
+                                        if (matchedSub.id != currentSubIdx) {
+                                            selectSubtitleTrack(matchedSub.id)
+                                            currentSubIdx = matchedSub.id
+                                        }
+                                    } else {
+                                        // Preferred subtitle language not found in video -> disable subtitles
+                                        if (currentSubIdx != -1) {
+                                            selectSubtitleTrack(-1)
+                                            currentSubIdx = -1
+                                        }
+                                    }
+                                } else {
+                                    // Subtitle preferred set to None -> disable subtitles
+                                    if (currentSubIdx != -1) {
+                                        selectSubtitleTrack(-1)
+                                        currentSubIdx = -1
+                                    }
+                                }
+                            }
+
+                            _audioTracks.value = newAudioTracks.map { it.copy(selected = it.id == currentAudioIdx) }
                             _selectedAudioIndex.value = currentAudioIdx
 
-                            _subtitleTracks.value = newSubtitleTracks
+                            _subtitleTracks.value = newSubtitleTracks.map { it.copy(selected = it.id == currentSubIdx) }
                             _selectedSubtitleIndex.value = currentSubIdx
                         }
 
@@ -340,15 +463,38 @@ class PlayerManager(private val context: Context) {
                             val isMediaCodecRendererError = error.message?.contains("MediaCodecVideoRenderer") == true ||
                                     error.errorCode == PlaybackException.ERROR_CODE_DECODING_FAILED
 
+                            val isAudioError = error.message?.contains("Audio", ignoreCase = true) == true ||
+                                    error.cause?.message?.contains("Audio", ignoreCase = true) == true ||
+                                    error.errorCodeName.contains("AUDIO", ignoreCase = true)
+
                             when {
                                 isMediaCodecRendererError -> {
                                     AppLogger.log("Recovering from MediaCodecVideoRenderer crash...")
-                                    val lastPos = exoPlayer?.currentPosition ?: 0L
-                                    exoPlayer?.prepare()
-                                    exoPlayer?.seekTo(lastPos)
+                                    val lastPos = exoPlayer?.currentPosition ?: _currentPosition.value
+                                    if (currentDecoderMode == DecoderMode.HW && onDecoderFallback != null) {
+                                        onDecoderFallback?.invoke(DecoderMode.HW_PLUS)
+                                    } else {
+                                        exoPlayer?.prepare()
+                                        exoPlayer?.seekTo(lastPos)
+                                    }
                                 }
                                 isFormatUnsupported || isDecoderFailed -> {
-                                    _playerError.value = "Hardware unsupported: Your device cannot decode this video format (e.g., HEVC 10-bit)."
+                                    val fallbackMode = when (currentDecoderMode) {
+                                        DecoderMode.HW -> DecoderMode.HW_PLUS
+                                        DecoderMode.SW -> DecoderMode.HW_PLUS
+                                        DecoderMode.HW_PLUS -> if (isAudioError) null else DecoderMode.SW
+                                    }
+                                    if (fallbackMode != null && fallbackMode != currentDecoderMode && onDecoderFallback != null) {
+                                        AppLogger.log("Decoder fallback: Switching from $currentDecoderMode to $fallbackMode due to ${error.errorCodeName}")
+                                        onDecoderFallback?.invoke(fallbackMode)
+                                    } else {
+                                        val errorMsg = if (isAudioError) {
+                                            "Audio format not supported by selected decoder."
+                                        } else {
+                                            "Playback error: Unsupported video format (${error.localizedMessage ?: error.errorCodeName})"
+                                        }
+                                        _playerError.value = errorMsg
+                                    }
                                 }
                                 isSourceError -> {
                                     // Skip the broken file - notify the ViewModel
@@ -356,7 +502,7 @@ class PlayerManager(private val context: Context) {
                                     onPlaybackError?.invoke(msg)
                                 }
                                 else -> {
-                                    _playerError.value = error.message ?: "Unknown playback error"
+                                    _playerError.value = error.localizedMessage ?: error.message ?: "Unknown playback error"
                                 }
                             }
                         }
@@ -379,6 +525,15 @@ class PlayerManager(private val context: Context) {
                             initializationDurationMs: Long
                         ) {
                             _videoDecoderName.value = decoderName
+                        }
+
+                        override fun onAudioDecoderInitialized(
+                            eventTime: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime,
+                            decoderName: String,
+                            initializedTimestampMs: Long,
+                            initializationDurationMs: Long
+                        ) {
+                            _audioDecoderName.value = decoderName
                         }
                     })
 
@@ -432,21 +587,66 @@ class PlayerManager(private val context: Context) {
 
             mediaSession = MediaSession.Builder(context, forwardingPlayer).build()
 
-            exoPlayer?.trackSelectionParameters = exoPlayer!!.trackSelectionParameters
-                .buildUpon()
-                .setPreferredAudioLanguage(if (defaultAudioLang.isEmpty()) null else defaultAudioLang)
-                .setPreferredTextLanguage(if (defaultSubtitleLang.isEmpty()) null else defaultSubtitleLang)
-                .build()
+            val audioEquivs = LanguageList.getEquivalents(defaultAudioLang)
+            val textEquivs = LanguageList.getEquivalents(defaultSubtitleLang)
+            val paramBuilder = exoPlayer!!.trackSelectionParameters.buildUpon()
+            if (audioEquivs.isNotEmpty()) {
+                paramBuilder.setPreferredAudioLanguages(*audioEquivs.toTypedArray())
+            } else {
+                paramBuilder.setPreferredAudioLanguages()
+            }
+            if (textEquivs.isNotEmpty()) {
+                paramBuilder.setPreferredTextLanguages(*textEquivs.toTypedArray())
+                paramBuilder.setTrackTypeDisabled(androidx.media3.common.C.TRACK_TYPE_TEXT, false)
+            } else {
+                paramBuilder.setPreferredTextLanguages()
+                paramBuilder.setTrackTypeDisabled(androidx.media3.common.C.TRACK_TYPE_TEXT, true)
+            }
+            exoPlayer?.trackSelectionParameters = paramBuilder.build()
         }
     }
 
     fun updatePreferredLanguages(audioLang: String, subLang: String) {
+        preferredAudioLang = audioLang
+        preferredSubtitleLang = subLang
         val player = exoPlayer ?: return
-        player.trackSelectionParameters = player.trackSelectionParameters
-            .buildUpon()
-            .setPreferredAudioLanguage(if (audioLang.isEmpty()) null else audioLang)
-            .setPreferredTextLanguage(if (subLang.isEmpty()) null else subLang)
-            .build()
+
+        val audioEquivs = LanguageList.getEquivalents(audioLang)
+        val textEquivs = LanguageList.getEquivalents(subLang)
+        val paramBuilder = player.trackSelectionParameters.buildUpon()
+
+        if (audioEquivs.isNotEmpty()) {
+            paramBuilder.setPreferredAudioLanguages(*audioEquivs.toTypedArray())
+        } else {
+            paramBuilder.setPreferredAudioLanguages()
+        }
+
+        if (textEquivs.isNotEmpty()) {
+            paramBuilder.setPreferredTextLanguages(*textEquivs.toTypedArray())
+            paramBuilder.setTrackTypeDisabled(androidx.media3.common.C.TRACK_TYPE_TEXT, false)
+        } else {
+            paramBuilder.setPreferredTextLanguages()
+            paramBuilder.setTrackTypeDisabled(androidx.media3.common.C.TRACK_TYPE_TEXT, true)
+        }
+        player.trackSelectionParameters = paramBuilder.build()
+
+        if (audioLang.isNotBlank()) {
+            val matchingAudio = _audioTracks.value.find { LanguageList.isMatch(it.language, it.label, audioLang) }
+            if (matchingAudio != null) {
+                selectAudioTrack(matchingAudio.id)
+            }
+        }
+
+        if (subLang.isNotBlank()) {
+            val matchingSub = _subtitleTracks.value.find { it.id != -1 && LanguageList.isMatch(it.language, it.label, subLang) }
+            if (matchingSub != null) {
+                selectSubtitleTrack(matchingSub.id)
+            } else {
+                selectSubtitleTrack(-1)
+            }
+        } else {
+            selectSubtitleTrack(-1)
+        }
     }
 
     private fun applyLoudnessEnhancer(audioSessionId: Int) {
@@ -482,12 +682,19 @@ class PlayerManager(private val context: Context) {
         }
     }
 
-    fun playVideo(video: Video) {
+    fun playVideo(video: Video, startPositionMs: Long = 0L) {
         val player = exoPlayer ?: return
+        hasAutoSelectedTracksForCurrentMedia = false
+        currentExternalSubtitleUri = null
         _playerError.value = null
         _chapters.value = emptyList()
         val mediaItem = MediaItem.fromUri(video.uri)
-        player.setMediaItem(mediaItem)
+        if (startPositionMs > 0L) {
+            player.setMediaItem(mediaItem, startPositionMs)
+            _currentPosition.value = startPositionMs
+        } else {
+            player.setMediaItem(mediaItem)
+        }
         player.prepare()
         player.playWhenReady = true
         _isPlaying.value = true
@@ -571,13 +778,15 @@ class PlayerManager(private val context: Context) {
     }
 
     fun releasePlayerAndKeepState(): Pair<Long, Boolean> {
-        val pos = exoPlayer?.currentPosition ?: 0L
-        val playing = exoPlayer?.isPlaying ?: false
+        val pos = exoPlayer?.currentPosition?.takeIf { it > 0L } ?: _currentPosition.value
+        val playing = exoPlayer?.isPlaying ?: _isPlaying.value
         releasePlayer()
         return Pair(pos, playing)
     }
 
     fun releasePlayer() {
+        _videoDecoderName.value = null
+        _audioDecoderName.value = null
         mediaSession?.release()
         mediaSession = null
         exoPlayer?.release()
@@ -667,6 +876,8 @@ class PlayerManager(private val context: Context) {
     fun loadExternalSubtitle(uri: Uri, mimeType: String, encodingLabel: String = "UTF-8") {
         val player = exoPlayer ?: return
         val currentMediaItem = player.currentMediaItem ?: return
+        currentExternalSubtitleUri = uri
+        hasAutoSelectedTracksForCurrentMedia = true
 
         val uriPath = uri.path ?: uri.toString()
         val ext = uriPath.substringAfterLast('.', "").lowercase()

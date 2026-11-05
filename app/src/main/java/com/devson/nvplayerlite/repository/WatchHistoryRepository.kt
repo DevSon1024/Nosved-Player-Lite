@@ -13,6 +13,12 @@ class WatchHistoryRepository(context: Context) {
     /** Observe history list (most recently played first). */
     val historyFlow: Flow<List<WatchHistory>> = dao.observeHistory()
 
+    /** Get saved playback position in milliseconds. */
+    suspend fun getPosition(uri: String): Long = dao.getHistoryByUri(uri)?.lastPositionMs ?: 0L
+
+    /** Get full history entry by URI. */
+    suspend fun getHistory(uri: String): WatchHistory? = dao.getHistoryByUri(uri)
+
     /** Call when a video starts playing to record/update it in history. */
     suspend fun recordPlay(video: Video) {
         // Preserve existing path & position so DB entry is never lost by path-based filtering

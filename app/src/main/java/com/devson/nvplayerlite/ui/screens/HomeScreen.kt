@@ -94,6 +94,7 @@ fun HomeScreen(
     val latestVideos by homeViewModel.latestVideos.collectAsState()
     val uiState by homeViewModel.uiState.collectAsState()
     val viewSettings by videoListViewModel.viewSettings.collectAsState()
+    val historyMap = remember(history) { history.associateBy { it.uri } }
 
     LaunchedEffect(Unit) { videoListViewModel.loadVideos() }
 
@@ -381,7 +382,7 @@ fun HomeScreen(
                     items(latestVideos, key = { it.uri }) { video ->
                         VideoCard(
                             video = video,
-                            onClick = { onVideoSelected(video, latestVideos, 0L) }
+                            onClick = { onVideoSelected(video, latestVideos, historyMap[video.uri]?.lastPositionMs ?: 0L) }
                         )
                     }
                 }

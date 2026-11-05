@@ -97,6 +97,10 @@ fun PlayerSettingsSideSheet(
     val onUpdateIsAmbientModeEnabled = actions.onUpdateIsAmbientModeEnabled
     val onUpdateAmbientBlurStyle = actions.onUpdateAmbientBlurStyle
     val onUpdateSaveBrightnessLevel = actions.onUpdateSaveBrightnessLevel
+    val onUpdateBackgroundPlayEnabled = actions.onUpdateBackgroundPlayEnabled
+    val onUpdateShowStatsOverlay = actions.onUpdateShowStatsOverlay
+    val onUpdateShowElapsedTimeOverlay = actions.onUpdateShowElapsedTimeOverlay
+    val onUpdateShowScreenRotationButton = actions.onUpdateShowScreenRotationButton
 
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -242,33 +246,10 @@ fun PlayerSettingsSideSheet(
                         }
                     }
 
-                    // Header row
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 20.dp, vertical = 12.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Playback Settings",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-
-                        IconButton(
-                            onClick = onDismiss,
-                            colors = IconButtonDefaults.iconButtonColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                            )
-                        ) {
-                            Icon(
-                                imageVector = Icons.Rounded.Close,
-                                contentDescription = "Close sheet",
-                                tint = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
+                    if (isLandscape) {
+                        Spacer(Modifier.height(12.dp))
+                    } else {
+                        Spacer(Modifier.height(4.dp))
                     }
 
                     // Tab selector row
@@ -360,6 +341,7 @@ fun PlayerSettingsSideSheet(
                                 onUpdateIsBottomLayoutEnabled = onUpdateIsBottomLayoutEnabled,
                                 onUpdateShowControlGradients = onUpdateShowControlGradients,
                                 onUpdateShowUpNextQueue = onUpdateShowUpNextQueue,
+                                onUpdateBackgroundPlayEnabled = onUpdateBackgroundPlayEnabled,
                                 onShowOrientationDialog = { showOrientationDialog = true },
                                 onShowScalingDialog = { showScalingDialog = true },
                                 onShowSoftButtonDialog = { showSoftButtonDialog = true },
@@ -369,6 +351,8 @@ fun PlayerSettingsSideSheet(
                             )
                             3 -> OverlaysTab(
                                 playbackSettings = playbackSettings,
+                                onUpdateShowStatsOverlay = onUpdateShowStatsOverlay,
+                                onUpdateShowElapsedTimeOverlay = onUpdateShowElapsedTimeOverlay,
                                 onUpdateShowRemainingTime = onUpdateShowRemainingTime,
                                 onUpdateShowBatteryClockOverlay = onUpdateShowBatteryClockOverlay,
                                 onUpdateShowControlGradients = onUpdateShowControlGradients,
@@ -379,7 +363,8 @@ fun PlayerSettingsSideSheet(
                                 playbackSettings = playbackSettings,
                                 onUpdatePauseWhenObstructed = onUpdatePauseWhenObstructed,
                                 onUpdateKeepAwakeAlways = onUpdateKeepAwakeAlways,
-                                onUpdateSaveBrightnessLevel = onUpdateSaveBrightnessLevel
+                                onUpdateSaveBrightnessLevel = onUpdateSaveBrightnessLevel,
+                                onUpdateShowScreenRotationButton = onUpdateShowScreenRotationButton
                             )
                             5 -> InformationTab(
                                 video = currentVideo
@@ -971,6 +956,7 @@ private fun InterfaceTab(
     onUpdateIsBottomLayoutEnabled: (Boolean) -> Unit,
     onUpdateShowControlGradients: (Boolean) -> Unit,
     onUpdateShowUpNextQueue: (Boolean) -> Unit,
+    onUpdateBackgroundPlayEnabled: (Boolean) -> Unit = {},
     onShowOrientationDialog: () -> Unit,
     onShowScalingDialog: () -> Unit,
     onShowSoftButtonDialog: () -> Unit,
@@ -1084,6 +1070,26 @@ private fun InterfaceTab(
                 checked = playbackSettings.autoPlayEnabled,
                 onCheckedChange = onUpdateAutoPlayEnabled
             )
+
+            SheetDivider()
+
+            SheetToggleRow(
+                icon = Icons.Default.Headphones,
+                title = "Background Playback",
+                subtitle = "Continue playing audio in background when exiting player",
+                checked = playbackSettings.backgroundPlayEnabled,
+                onCheckedChange = onUpdateBackgroundPlayEnabled
+            )
+
+            SheetDivider()
+
+            SheetToggleRow(
+                icon = Icons.Default.QueueMusic,
+                title = "Show Up Next Queue",
+                subtitle = "Display next videos in playlist overlay",
+                checked = playbackSettings.showUpNextQueue,
+                onCheckedChange = onUpdateShowUpNextQueue
+            )
         }
     }
 }
@@ -1094,6 +1100,8 @@ private fun InterfaceTab(
 @Composable
 private fun OverlaysTab(
     playbackSettings: PlaybackSettings,
+    onUpdateShowStatsOverlay: (Boolean) -> Unit = {},
+    onUpdateShowElapsedTimeOverlay: (Boolean) -> Unit = {},
     onUpdateShowRemainingTime: (Boolean) -> Unit,
     onUpdateShowBatteryClockOverlay: (Boolean) -> Unit,
     onUpdateShowControlGradients: (Boolean) -> Unit = {},
@@ -1103,6 +1111,26 @@ private fun OverlaysTab(
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         SheetSectionLabel("Player Overlays & Appearance")
         SheetCard {
+            SheetToggleRow(
+                icon = Icons.Default.Info,
+                title = "Show Statistics Overlay",
+                subtitle = "Display real-time FPS, codecs, NosvedMedia info, decoders, and audio/video/subtitle track details",
+                checked = playbackSettings.showStatsOverlay,
+                onCheckedChange = onUpdateShowStatsOverlay
+            )
+
+            SheetDivider()
+
+            SheetToggleRow(
+                icon = Icons.Default.Timer,
+                title = "Show Elapsed Time Overlay",
+                subtitle = "Display elapsed time overlay on video",
+                checked = playbackSettings.showElapsedTimeOverlay,
+                onCheckedChange = onUpdateShowElapsedTimeOverlay
+            )
+
+            SheetDivider()
+
             SheetToggleRow(
                 icon = Icons.Default.HourglassBottom,
                 title = "Show Remaining Time",
@@ -1142,11 +1170,22 @@ private fun AutomationTab(
     playbackSettings: PlaybackSettings,
     onUpdatePauseWhenObstructed: (Boolean) -> Unit,
     onUpdateKeepAwakeAlways: (Boolean) -> Unit,
-    onUpdateSaveBrightnessLevel: (Boolean) -> Unit
+    onUpdateSaveBrightnessLevel: (Boolean) -> Unit,
+    onUpdateShowScreenRotationButton: (Boolean) -> Unit = {}
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         SheetSectionLabel("Automation & Power Behaviors")
         SheetCard {
+            SheetToggleRow(
+                icon = Icons.Default.ScreenRotationAlt,
+                title = "Show Screen Rotation Button",
+                subtitle = "Show rotation button when device is rotated",
+                checked = playbackSettings.showScreenRotationButton,
+                onCheckedChange = onUpdateShowScreenRotationButton
+            )
+
+            SheetDivider()
+
             SheetToggleRow(
                 icon = Icons.Default.PauseCircle,
                 title = "Pause on Obstruction",

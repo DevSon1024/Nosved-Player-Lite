@@ -1,5 +1,6 @@
 package com.devson.nvplayerlite.ui.components
 
+import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -7,6 +8,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -109,6 +111,7 @@ fun PlayerControls(
     title: String,
     currentPosition: Long,
     duration: Long,
+    videoUri: Uri? = null,
     onPlayPauseToggle: () -> Unit,
     onSeekTo: (Long) -> Unit,
     onControlsStateChange: () -> Unit,
@@ -151,7 +154,9 @@ fun PlayerControls(
     currentDecoder: DecoderMode = DecoderMode.HW_PLUS,
     onSelectDecoder: ((DecoderMode) -> Unit)? = null,
     onScrubbingModeChange: (Boolean) -> Unit = {},
-    onSpeedMenuClick: (() -> Unit)? = null
+    onSpeedMenuClick: (() -> Unit)? = null,
+    playbackSettings: com.devson.nvplayerlite.repository.PlaybackSettings? = null,
+    playerSettingsActions: com.devson.nvplayerlite.model.PlayerSettingsActions? = null
 ) {
     var showSettingsSheet by remember { mutableStateOf(false) }
     var showDecoderDialog by remember { mutableStateOf(false) }
@@ -388,6 +393,10 @@ fun PlayerControls(
 
                     val effectivePosition = if (isDragging) sliderPosition.toLong() else currentPosition
 
+                    val safeDuration = if (duration > 0) duration.toFloat() else 100f
+                    val safeValueRange = 0f..safeDuration
+                    val safeSliderPosition = sliderPosition.coerceIn(0f, safeDuration)
+
                     // Row 1: Time + Seekbar + Time
                     Row(
                         modifier = Modifier.fillMaxWidth().offset(y = (-6).dp),
@@ -400,10 +409,6 @@ fun PlayerControls(
                         )
                         Spacer(Modifier.width(8.dp))
 
-                        val safeDuration = if (duration > 0) duration.toFloat() else 100f
-                        val safeValueRange = 0f..safeDuration
-                        val safeSliderPosition = sliderPosition.coerceIn(0f, safeDuration)
-
                         if (seekBarStyle == SeekBarStyle.FLAT) {
                             FlatSeekBar(
                                 value = safeSliderPosition,
@@ -413,13 +418,12 @@ fun PlayerControls(
                                     if (!isDragging) onScrubbingModeChange(true)
                                     isDragging = true
                                     sliderPosition = it
-                                    onSeekTo(it.toLong())
                                 },
                                 onValueChangeFinished = {
                                     onSeekTo(sliderPosition.toLong())
                                     onScrubbingModeChange(false)
                                     draggingJob = scope.launch {
-                                        kotlinx.coroutines.delay(800)
+                                        kotlinx.coroutines.delay(300)
                                         isDragging = false
                                     }
                                 },
@@ -430,15 +434,15 @@ fun PlayerControls(
                                 value = safeSliderPosition,
                                 onValueChange = {
                                     draggingJob?.cancel()
+                                    if (!isDragging) onScrubbingModeChange(true)
                                     isDragging = true
                                     sliderPosition = it
-                                    onSeekTo(it.toLong())
                                 },
                                 onValueChangeFinished = {
                                     onSeekTo(sliderPosition.toLong())
                                     onScrubbingModeChange(false)
                                     draggingJob = scope.launch {
-                                        kotlinx.coroutines.delay(800)
+                                        kotlinx.coroutines.delay(300)
                                         isDragging = false
                                     }
                                 },
@@ -612,6 +616,8 @@ fun PlayerControls(
     PlaybackSettingsSheet(
         showSettingsSheet = showSettingsSheet,
         sheetState = sheetState,
+        playbackSettings = playbackSettings,
+        actions = playerSettingsActions,
         seekDurationSeconds = seekDurationSeconds,
         seekBarStyle = seekBarStyle,
         controlIconSize = controlIconSize,
