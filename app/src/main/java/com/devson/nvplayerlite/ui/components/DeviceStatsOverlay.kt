@@ -422,72 +422,63 @@ private fun parseVideoDecoder(
     sampleMimeType: String?,
     decoderMode: DecoderMode?
 ): DecoderInfo {
-    if (decoderName != null) {
-        val lower = decoderName.lowercase()
-        return when {
-            lower.contains("ffmpeg") -> DecoderInfo(
-                badge = "SW",
-                isHardware = false,
-                decoderName = "NosvedMedia FFmpeg Video",
-                technology = "FFmpeg 7.1 Native Multi-threaded (libavcodec)"
-            )
-            lower.contains("dav1d") -> DecoderInfo(
-                badge = "SW",
-                isHardware = false,
-                decoderName = "NosvedMedia dav1d Video",
-                technology = "dav1d 1.5.0 SIMD AV1 Native"
-            )
-            lower.contains("c2.android") || lower.contains("omx.google") -> DecoderInfo(
-                badge = "SW",
-                isHardware = false,
-                decoderName = decoderName,
-                technology = "Android Platform Software Codec"
-            )
-            lower.contains("c2.qti") || lower.contains("omx.qcom") -> DecoderInfo(
-                badge = "HW",
-                isHardware = true,
-                decoderName = decoderName,
-                technology = "Qualcomm MediaCodec (Hardware NDK)"
-            )
-            lower.contains("c2.exynos") || lower.contains("omx.exynos") -> DecoderInfo(
-                badge = "HW",
-                isHardware = true,
-                decoderName = decoderName,
-                technology = "Samsung Exynos MediaCodec (Hardware NDK)"
-            )
-            lower.contains("c2.mtk") || lower.contains("omx.mtk") -> DecoderInfo(
-                badge = "HW",
-                isHardware = true,
-                decoderName = decoderName,
-                technology = "MediaTek MediaCodec (Hardware NDK)"
-            )
-            else -> DecoderInfo(
-                badge = "HW",
-                isHardware = true,
-                decoderName = decoderName,
-                technology = "Hardware Accelerated MediaCodec"
-            )
+    if (decoderName.isNullOrBlank()) {
+        val modeBadge = when (decoderMode) {
+            DecoderMode.SW -> "SW"
+            DecoderMode.HW -> "HW"
+            else -> "HW+"
         }
+        return DecoderInfo(
+            badge = modeBadge,
+            isHardware = decoderMode == DecoderMode.HW,
+            decoderName = "Initializing...",
+            technology = "Waiting for first decoded frame"
+        )
     }
 
-    return when (decoderMode) {
-        DecoderMode.SW -> DecoderInfo(
+    val lower = decoderName.lowercase()
+    return when {
+        lower.contains("dav1d") -> DecoderInfo(
             badge = "SW",
             isHardware = false,
-            decoderName = if (sampleMimeType == "video/av01") "NosvedMedia dav1d" else "NosvedMedia FFmpeg",
-            technology = "NosvedMedia Native Software Engine"
+            decoderName = "NosvedMedia dav1d Video",
+            technology = "dav1d 1.5.0 SIMD AV1 Native"
         )
-        DecoderMode.HW -> DecoderInfo(
+        lower.contains("ffmpeg") -> DecoderInfo(
+            badge = "SW",
+            isHardware = false,
+            decoderName = "NosvedMedia FFmpeg Video",
+            technology = "FFmpeg 7.1 Native Multi-threaded (libavcodec)"
+        )
+        lower.contains("c2.android") || lower.contains("omx.google") -> DecoderInfo(
+            badge = "SW",
+            isHardware = false,
+            decoderName = decoderName,
+            technology = "Android Platform Software Codec"
+        )
+        lower.contains("c2.qti") || lower.contains("omx.qcom") -> DecoderInfo(
             badge = "HW",
             isHardware = true,
-            decoderName = "MediaCodec Hardware",
-            technology = "Hardware Accelerated MediaCodec"
+            decoderName = decoderName,
+            technology = "Qualcomm MediaCodec (Hardware NDK)"
+        )
+        lower.contains("c2.exynos") || lower.contains("omx.exynos") -> DecoderInfo(
+            badge = "HW",
+            isHardware = true,
+            decoderName = decoderName,
+            technology = "Samsung Exynos MediaCodec (Hardware NDK)"
+        )
+        lower.contains("c2.mtk") || lower.contains("omx.mtk") -> DecoderInfo(
+            badge = "HW",
+            isHardware = true,
+            decoderName = decoderName,
+            technology = "MediaTek MediaCodec (Hardware NDK)"
         )
         else -> DecoderInfo(
-            badge = "HW+",
+            badge = "HW",
             isHardware = true,
-            decoderName = "MediaCodec + Nosved Fallback",
-            technology = "Hardware with Software Fallback"
+            decoderName = decoderName,
+            technology = "Hardware Accelerated MediaCodec"
         )
     }
 }
@@ -506,47 +497,44 @@ private fun parseAudioDecoder(
         )
     }
 
-    if (decoderName != null) {
-        val lower = decoderName.lowercase()
-        return when {
-            lower.contains("ffmpeg") -> DecoderInfo(
-                badge = "SW",
-                isHardware = false,
-                decoderName = "NosvedMedia FFmpeg Audio",
-                technology = "FFmpeg 7.1 Audio Decoding (libswresample)"
-            )
-            lower.contains("c2.android") || lower.contains("omx.google") -> DecoderInfo(
-                badge = "SW",
-                isHardware = false,
-                decoderName = decoderName,
-                technology = "Android Platform Software Codec"
-            )
-            lower.contains("c2.qti") || lower.contains("omx.qcom") || lower.contains("c2.exynos") || lower.contains("c2.mtk") -> DecoderInfo(
-                badge = "HW",
-                isHardware = true,
-                decoderName = decoderName,
-                technology = "Hardware Accelerated MediaCodec Audio"
-            )
-            else -> DecoderInfo(
-                badge = "HW",
-                isHardware = true,
-                decoderName = decoderName,
-                technology = "Hardware Accelerated Audio Pipeline"
-            )
+    if (decoderName.isNullOrBlank()) {
+        val modeBadge = when (decoderMode) {
+            DecoderMode.SW -> "SW"
+            DecoderMode.HW -> "HW"
+            else -> "HW+"
         }
+        return DecoderInfo(
+            badge = modeBadge,
+            isHardware = decoderMode != DecoderMode.SW,
+            decoderName = "Initializing...",
+            technology = "Waiting for first decoded sample"
+        )
     }
 
-    return when (decoderMode) {
-        DecoderMode.SW -> DecoderInfo(
+    val lower = decoderName.lowercase()
+    return when {
+        lower.contains("ffmpeg") -> DecoderInfo(
             badge = "SW",
             isHardware = false,
             decoderName = "NosvedMedia FFmpeg Audio",
-            technology = "FFmpeg 7.1 Audio Software Engine"
+            technology = "FFmpeg 7.1 Audio Decoding (libswresample)"
+        )
+        lower.contains("c2.android") || lower.contains("omx.google") -> DecoderInfo(
+            badge = "SW",
+            isHardware = false,
+            decoderName = decoderName,
+            technology = "Android Platform Software Codec"
+        )
+        lower.contains("c2.qti") || lower.contains("omx.qcom") || lower.contains("c2.exynos") || lower.contains("c2.mtk") -> DecoderInfo(
+            badge = "HW",
+            isHardware = true,
+            decoderName = decoderName,
+            technology = "Hardware Accelerated MediaCodec Audio"
         )
         else -> DecoderInfo(
             badge = "HW",
             isHardware = true,
-            decoderName = "Android MediaCodec / AudioTrack",
+            decoderName = decoderName,
             technology = "Hardware Accelerated Audio Pipeline"
         )
     }
