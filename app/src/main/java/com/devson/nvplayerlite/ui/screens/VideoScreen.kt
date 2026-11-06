@@ -104,14 +104,14 @@ fun VideoScreen(
     val currentPosition by (viewModel.currentPosition ?: kotlinx.coroutines.flow.flowOf(0L)).collectAsState(initial = 0L)
     val duration by (viewModel.duration ?: kotlinx.coroutines.flow.flowOf(0L)).collectAsState(initial = 0L)
     val bufferedPosition by (viewModel.bufferedPosition ?: kotlinx.coroutines.flow.flowOf(0L)).collectAsState(initial = 0L)
-    val videoFps by (viewModel.videoFps ?: kotlinx.coroutines.flow.flowOf(0f)).collectAsState(initial = 0f)
     val videoDecoderName by (viewModel.videoDecoderName ?: kotlinx.coroutines.flow.flowOf(null)).collectAsState(initial = null)
     val audioDecoderName by (viewModel.audioDecoderName ?: kotlinx.coroutines.flow.flowOf(null)).collectAsState(initial = null)
     val videoDecoderState by (viewModel.videoDecoderState ?: kotlinx.coroutines.flow.flowOf(com.nosved.nosvedmedia.media3.DecoderState.IDLE)).collectAsState(initial = com.nosved.nosvedmedia.media3.DecoderState.IDLE)
     val audioDecoderState by (viewModel.audioDecoderState ?: kotlinx.coroutines.flow.flowOf(com.nosved.nosvedmedia.media3.DecoderState.IDLE)).collectAsState(initial = com.nosved.nosvedmedia.media3.DecoderState.IDLE)
     val fallbackReason by (viewModel.fallbackReason ?: kotlinx.coroutines.flow.flowOf(null)).collectAsState(initial = null)
-    val decodeLatencyMs by (viewModel.averageDecodeLatencyMs ?: kotlinx.coroutines.flow.flowOf(0.0)).collectAsState(initial = 0.0)
-    val framesDropped by (viewModel.framesDropped ?: kotlinx.coroutines.flow.flowOf(0L)).collectAsState(initial = 0L)
+    val videoDecoderPreference by viewModel.videoDecoderPreference.collectAsState()
+    val audioDecoderPreference by viewModel.audioDecoderPreference.collectAsState()
+    val fallbackHistory by viewModel.fallbackHistory.collectAsState()
 
     val controlsVisible by viewModel.controlsVisible.collectAsState()
     val currentVideo by viewModel.currentVideo.collectAsState()
@@ -618,15 +618,19 @@ fun VideoScreen(
         DeviceStatsOverlay(
             visible = showStats || playbackSettings.showStatsOverlay,
             player = player,
-            videoFps = videoFps,
+            videoFpsProvider = { viewModel.videoFps?.value ?: 0f },
             videoDecoderName = videoDecoderName,
             audioDecoderName = audioDecoderName,
             decoderMode = currentDecoder,
+            videoDecoderPreference = videoDecoderPreference,
+            audioDecoderPreference = audioDecoderPreference,
             videoDecoderState = videoDecoderState,
             audioDecoderState = audioDecoderState,
             fallbackReason = fallbackReason,
-            decodeLatencyMs = decodeLatencyMs,
-            framesDropped = framesDropped,
+            decodeLatencyMsProvider = { viewModel.averageDecodeLatencyMs?.value ?: 0.0 },
+            framesDroppedProvider = { viewModel.framesDropped?.value ?: 0L },
+            fallbackHistory = fallbackHistory,
+            playerError = playerError,
             onDismiss = {
                 viewModel.setShowStats(false)
                 settingsViewModel.updateShowStatsOverlay(false)
@@ -888,7 +892,7 @@ fun VideoScreen(
                 showRemainingTime = showRemainingTime,
                 onShowRemainingTimeChange = { settingsViewModel.updateShowRemainingTime(it) },
                 currentDecoder = currentDecoder,
-                onSelectDecoder = { showDecoderSideSheet = true },
+                onSelectDecoder = { mode -> viewModel.setDecoderMode(mode) },
                 onToggleScreenRotation = {
                     val currentMode = activity?.requestedOrientation
                     if (currentMode == ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE || currentMode == ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE) {

@@ -40,6 +40,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -55,7 +56,10 @@ import androidx.media3.common.Format
 import androidx.media3.common.Player
 import com.devson.nvplayerlite.repository.DecoderMode
 import com.nosved.nosvedmedia.NosvedMedia
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.withContext
 import java.io.BufferedReader
 import java.io.FileReader
 
@@ -79,6 +83,8 @@ data class DecoderInfo(
 data class PlaybackStats(
     // Mode
     val requestedDecoderMode: String = "Auto (HW+)",
+    val requestedVideoPreference: String = "Auto",
+    val requestedAudioPreference: String = "Auto",
 
     // Video Track
     val videoResolution: String = "N/A",
@@ -108,6 +114,10 @@ data class PlaybackStats(
     val audioDecoderInfo: DecoderInfo = DecoderInfo("HW", true, "MediaCodec / AudioTrack", "Hardware Accelerated Audio"),
     val audioDecoderStateDisplay: String = "Actively Decoding",
 
+    // Recovery and Errors
+    val fallbackHistory: List<String> = emptyList(),
+    val activeError: String? = null,
+
     // Subtitle Track
     val hasActiveSubtitle: Boolean = false,
     val subtitleCodecMime: String = "None",
@@ -134,40 +144,76 @@ fun DeviceStatsOverlay(
     player: Player?,
     modifier: Modifier = Modifier,
     videoFps: Float = 0f,
+    videoFpsProvider: (() -> Float)? = null,
     videoDecoderName: String? = null,
     audioDecoderName: String? = null,
     decoderMode: DecoderMode? = null,
+    videoDecoderPreference: com.nosved.nosvedmedia.media3.DecoderPreference? = null,
+    audioDecoderPreference: com.nosved.nosvedmedia.media3.DecoderPreference? = null,
     videoDecoderState: com.nosved.nosvedmedia.media3.DecoderState? = null,
     audioDecoderState: com.nosved.nosvedmedia.media3.DecoderState? = null,
     fallbackReason: String? = null,
     decodeLatencyMs: Double = 0.0,
+    decodeLatencyMsProvider: (() -> Double)? = null,
     framesDropped: Long = 0L,
+    framesDroppedProvider: (() -> Long)? = null,
+    fallbackHistory: List<String> = emptyList(),
+    playerError: String? = null,
     onDismiss: () -> Unit = {}
 ) {
     val context = LocalContext.current
     var deviceStats by remember { mutableStateOf(DeviceStats()) }
     var playbackStats by remember { mutableStateOf(PlaybackStats()) }
 
-    LaunchedEffect(
-        visible, player, videoDecoderName, audioDecoderName, decoderMode,
-        videoDecoderState, audioDecoderState, fallbackReason, decodeLatencyMs, framesDropped
-    ) {
+    val updatedPlayer by rememberUpdatedState(player)
+    val updatedFps by rememberUpdatedState(videoFps)
+    val updatedVideoDecoderName by rememberUpdatedState(videoDecoderName)
+    val updatedAudioDecoderName by rememberUpdatedState(audioDecoderName)
+    val updatedDecoderMode by rememberUpdatedState(decoderMode)
+    val updatedVideoPreference by rememberUpdatedState(videoDecoderPreference)
+    val updatedAudioPreference by rememberUpdatedState(audioDecoderPreference)
+    val updatedVideoState by rememberUpdatedState(videoDecoderState)
+    val updatedAudioState by rememberUpdatedState(audioDecoderState)
+    val updatedFallbackReason by rememberUpdatedState(fallbackReason)
+    val updatedDecodeLatencyMs by rememberUpdatedState(decodeLatencyMs)
+    val updatedFramesDropped by rememberUpdatedState(framesDropped)
+    val updatedFallbackHistory by rememberUpdatedState(fallbackHistory)
+    val updatedPlayerError by rememberUpdatedState(playerError)
+
+    LaunchedEffect(visible) {
         if (visible) {
-            while (true) {
-                deviceStats = collectStats(context, videoFps)
-                playbackStats = collectPlaybackStats(
-                    player = player,
+            var prevCpuStat: LongArray? = null
+            while (isActive) {
+                val currentFps = videoFpsProvider?.invoke() ?: updatedFps
+                val currentLatency = decodeLatencyMsProvider?.invoke() ?: updatedDecodeLatencyMs
+                val currentDropped = framesDroppedProvider?.invoke() ?: updatedFramesDropped
+
+                val (dStats, newCpuStat) = withContext(Dispatchers.IO) {
+                    collectStats(context, currentFps, prevCpuStat)
+                }
+                prevCpuStat = newCpuStat
+
+                val pStats = collectPlaybackStats(
+                    player = updatedPlayer,
                     context = context,
-                    reportedFps = videoFps,
-                    videoDecoderName = videoDecoderName,
-                    audioDecoderName = audioDecoderName,
-                    decoderMode = decoderMode,
-                    videoDecoderState = videoDecoderState,
-                    audioDecoderState = audioDecoderState,
-                    fallbackReason = fallbackReason,
-                    decodeLatencyMs = decodeLatencyMs,
-                    framesDropped = framesDropped
+                    reportedFps = currentFps,
+                    videoDecoderName = updatedVideoDecoderName,
+                    audioDecoderName = updatedAudioDecoderName,
+                    decoderMode = updatedDecoderMode,
+                    videoDecoderPreference = updatedVideoPreference,
+                    audioDecoderPreference = updatedAudioPreference,
+                    videoDecoderState = updatedVideoState,
+                    audioDecoderState = updatedAudioState,
+                    fallbackReason = updatedFallbackReason,
+                    decodeLatencyMs = currentLatency,
+                    framesDropped = currentDropped,
+                    fallbackHistory = updatedFallbackHistory,
+                    playerError = updatedPlayerError
                 )
+
+                deviceStats = dStats
+                playbackStats = pStats
+
                 delay(1000)
             }
         }
@@ -249,7 +295,7 @@ fun DeviceStatsOverlay(
                     badge = playbackStats.videoDecoderInfo.badge,
                     isHardware = playbackStats.videoDecoderInfo.isHardware
                 )
-                StatItem("Requested Mode", playbackStats.requestedDecoderMode)
+                StatItem("Decoder Mode", playbackStats.requestedDecoderMode)
                 StatItem("Active Decoder", playbackStats.videoDecoderInfo.decoderName)
                 StatItem("Decoder State", playbackStats.videoDecoderStateDisplay)
                 StatItem("Technology", playbackStats.videoDecoderInfo.technology)
@@ -282,6 +328,7 @@ fun DeviceStatsOverlay(
                     badge = playbackStats.audioDecoderInfo.badge,
                     isHardware = playbackStats.audioDecoderInfo.isHardware
                 )
+                StatItem("Decoder Mode", playbackStats.requestedDecoderMode)
                 StatItem("Active Track", "${playbackStats.audioTrackLabel} (${playbackStats.audioLanguage})")
                 StatItem("Active Decoder", playbackStats.audioDecoderInfo.decoderName)
                 StatItem("Decoder State", playbackStats.audioDecoderStateDisplay)
@@ -310,6 +357,24 @@ fun DeviceStatsOverlay(
                 if (playbackStats.subtitleTracksCount > 0) {
                     val subText = if (playbackStats.subtitleOtherLanguages.isNotBlank()) playbackStats.subtitleOtherLanguages else "${playbackStats.subtitleTracksCount} track(s)"
                     StatItem("Available Subs", subText)
+                }
+
+                // 4. RECOVERY & FALLBACK HISTORY
+                if (playbackStats.fallbackHistory.isNotEmpty()) {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.20f))
+                    StatsSectionHeader("RECOVERY & FALLBACK HISTORY")
+                    playbackStats.fallbackHistory.forEachIndexed { idx, entry ->
+                        StatItem("Fallback #${idx + 1}", entry, Color(0xFFFFB74D))
+                    }
+                }
+
+                // ERROR DETAILS
+                val activeErr = playbackStats.activeError
+                if (!activeErr.isNullOrBlank()) {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.20f))
+                    StatsSectionHeader("ERROR INFORMATION")
+                    StatItem("Error Status", "Playback Issue Detected", Color(0xFFEF5350))
+                    StatItem("Details", activeErr, Color(0xFFEF5350))
                 }
 
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.20f))
@@ -465,12 +530,11 @@ private fun parseVideoDecoder(
     if (decoderName.isNullOrBlank()) {
         val modeBadge = when (decoderMode) {
             DecoderMode.SW -> "SW"
-            DecoderMode.HW -> "HW"
-            else -> "HW+"
+            else -> "HW"
         }
         return DecoderInfo(
             badge = modeBadge,
-            isHardware = decoderMode == DecoderMode.HW,
+            isHardware = decoderMode != DecoderMode.SW,
             decoderName = "Initializing...",
             technology = "Waiting for first decoded frame"
         )
@@ -491,10 +555,10 @@ private fun parseVideoDecoder(
             technology = "FFmpeg 7.1 Native Multi-threaded (libavcodec)"
         )
         lower.contains("c2.android") || lower.contains("omx.google") -> DecoderInfo(
-            badge = "SW",
-            isHardware = false,
+            badge = if (decoderMode == DecoderMode.SW) "SW" else "HW",
+            isHardware = decoderMode != DecoderMode.SW,
             decoderName = decoderName,
-            technology = "Android Platform Software Codec"
+            technology = if (decoderMode == DecoderMode.SW) "Android Platform Software Codec" else "Platform MediaCodec Pipeline"
         )
         lower.contains("c2.qti") || lower.contains("omx.qcom") -> DecoderInfo(
             badge = "HW",
@@ -515,8 +579,8 @@ private fun parseVideoDecoder(
             technology = "MediaTek MediaCodec (Hardware NDK)"
         )
         else -> DecoderInfo(
-            badge = "HW",
-            isHardware = true,
+            badge = if (decoderMode == DecoderMode.SW) "SW" else "HW",
+            isHardware = decoderMode != DecoderMode.SW,
             decoderName = decoderName,
             technology = "Hardware Accelerated MediaCodec"
         )
@@ -530,18 +594,17 @@ private fun parseAudioDecoder(
 ): DecoderInfo {
     if (sampleMimeType == "audio/raw") {
         return DecoderInfo(
-            badge = "PCM",
-            isHardware = true,
+            badge = if (decoderMode == DecoderMode.SW) "SW" else "HW",
+            isHardware = decoderMode != DecoderMode.SW,
             decoderName = "System AudioTrack",
-            technology = "Direct Linear PCM Passthrough"
+            technology = "Direct Linear PCM Output"
         )
     }
 
     if (decoderName.isNullOrBlank()) {
         val modeBadge = when (decoderMode) {
             DecoderMode.SW -> "SW"
-            DecoderMode.HW -> "HW"
-            else -> "HW+"
+            else -> "HW"
         }
         return DecoderInfo(
             badge = modeBadge,
@@ -560,10 +623,10 @@ private fun parseAudioDecoder(
             technology = "FFmpeg 7.1 Audio Decoding (libswresample)"
         )
         lower.contains("c2.android") || lower.contains("omx.google") -> DecoderInfo(
-            badge = "SW",
-            isHardware = false,
+            badge = if (decoderMode == DecoderMode.SW) "SW" else "HW",
+            isHardware = decoderMode != DecoderMode.SW,
             decoderName = decoderName,
-            technology = "Android Platform Software Codec"
+            technology = if (decoderMode == DecoderMode.SW) "Android Platform Software Codec" else "Platform MediaCodec Audio"
         )
         lower.contains("c2.qti") || lower.contains("omx.qcom") || lower.contains("c2.exynos") || lower.contains("c2.mtk") -> DecoderInfo(
             badge = "HW",
@@ -572,8 +635,8 @@ private fun parseAudioDecoder(
             technology = "Hardware Accelerated MediaCodec Audio"
         )
         else -> DecoderInfo(
-            badge = "HW",
-            isHardware = true,
+            badge = if (decoderMode == DecoderMode.SW) "SW" else "HW",
+            isHardware = decoderMode != DecoderMode.SW,
             decoderName = decoderName,
             technology = "Hardware Accelerated Audio Pipeline"
         )
@@ -751,11 +814,15 @@ private fun collectPlaybackStats(
     videoDecoderName: String?,
     audioDecoderName: String?,
     decoderMode: DecoderMode?,
+    videoDecoderPreference: com.nosved.nosvedmedia.media3.DecoderPreference? = null,
+    audioDecoderPreference: com.nosved.nosvedmedia.media3.DecoderPreference? = null,
     videoDecoderState: com.nosved.nosvedmedia.media3.DecoderState? = null,
     audioDecoderState: com.nosved.nosvedmedia.media3.DecoderState? = null,
     fallbackReason: String? = null,
     decodeLatencyMs: Double = 0.0,
-    framesDropped: Long = 0L
+    framesDropped: Long = 0L,
+    fallbackHistory: List<String> = emptyList(),
+    playerError: String? = null
 ): PlaybackStats {
     var vRes = "N/A"
     var vMime = "N/A"
@@ -864,10 +931,13 @@ private fun collectPlaybackStats(
     val aDecInfo = parseAudioDecoder(audioDecoderName, aMime, decoderMode)
 
     val reqModeStr = when (decoderMode) {
-        DecoderMode.SW -> "Software Only (SW)"
-        DecoderMode.HW -> "Hardware Only (HW)"
-        else -> "Auto (HW+)"
+        DecoderMode.SW -> "SW (Software Only)"
+        DecoderMode.HW -> "HW (Hardware Only)"
+        else -> "HW+ (Hardware+ Auto Fallback)"
     }
+    val reqVideoPref = videoDecoderPreference?.displayName ?: reqModeStr
+    val reqAudioPref = audioDecoderPreference?.displayName ?: reqModeStr
+
     val vProfile = if (selectedVideoFormat != null) extractProfile(selectedVideoFormat) else ""
     val vBitDepth = if (selectedVideoFormat != null) extractBitDepth(selectedVideoFormat) else "8-bit"
     val vPixelFmt = if (selectedVideoFormat != null) extractPixelFormat(selectedVideoFormat) else "YUV420P"
@@ -876,6 +946,8 @@ private fun collectPlaybackStats(
 
     return PlaybackStats(
         requestedDecoderMode = reqModeStr,
+        requestedVideoPreference = reqVideoPref,
+        requestedAudioPreference = reqAudioPref,
         videoResolution = vRes,
         videoCodecMime = vMime,
         videoCodecFriendly = friendlyVideoCodec(vMime),
@@ -902,6 +974,9 @@ private fun collectPlaybackStats(
         audioDecoderInfo = aDecInfo,
         audioDecoderStateDisplay = aStateDisplay,
 
+        fallbackHistory = fallbackHistory,
+        activeError = playerError,
+
         hasActiveSubtitle = hasSub,
         subtitleCodecMime = sMime,
         subtitleCodecFriendly = friendlySubtitleCodec(sMime),
@@ -920,8 +995,12 @@ private fun collectPlaybackStats(
     )
 }
 
-private fun collectStats(context: Context, videoFps: Float): DeviceStats {
-    val cpu = readCpuUsage()
+private fun collectStats(
+    context: Context,
+    videoFps: Float,
+    prevCpuStat: LongArray?
+): Pair<DeviceStats, LongArray?> {
+    val (cpu, newCpuStat) = readCpuUsage(prevCpuStat)
 
     val am = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
     val memInfo = ActivityManager.MemoryInfo()
@@ -940,7 +1019,7 @@ private fun collectStats(context: Context, videoFps: Float): DeviceStats {
     val rawTemp = batteryIntent?.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, 0) ?: 0
     val tempC = rawTemp / 10f
 
-    return DeviceStats(
+    val stats = DeviceStats(
         cpuPercent = cpu,
         tempCelsius = tempC,
         usedMemMb = usedMb,
@@ -949,31 +1028,30 @@ private fun collectStats(context: Context, videoFps: Float): DeviceStats {
         batteryCharging = charging,
         videoFps = videoFps
     )
+    return Pair(stats, newCpuStat)
 }
 
-private fun readCpuUsage(): Int {
+private fun readCpuUsage(prevStat: LongArray?): Pair<Int, LongArray?> {
     return try {
-        fun readStat(): LongArray {
-            val line = BufferedReader(FileReader("/proc/stat")).use { it.readLine() } ?: return longArrayOf()
-            val parts = line.trim().split("\\s+".toRegex()).drop(1)
-            return parts.take(8).map { it.toLongOrNull() ?: 0L }.toLongArray()
+        val line = BufferedReader(FileReader("/proc/stat")).use { it.readLine() } ?: return Pair(0, null)
+        val parts = line.trim().split("\\s+".toRegex()).drop(1)
+        val currStat = parts.take(8).map { it.toLongOrNull() ?: 0L }.toLongArray()
+        if (currStat.isEmpty()) return Pair(0, null)
+        if (prevStat == null || prevStat.isEmpty()) {
+            return Pair(0, currStat)
         }
 
-        val stat1 = readStat()
-        Thread.sleep(100)
-        val stat2 = readStat()
-        if (stat1.isEmpty() || stat2.isEmpty()) return 0
-
-        val idle1 = stat1.getOrElse(3) { 0L }
-        val idle2 = stat2.getOrElse(3) { 0L }
-        val total1 = stat1.sum()
-        val total2 = stat2.sum()
+        val idle1 = prevStat.getOrElse(3) { 0L }
+        val idle2 = currStat.getOrElse(3) { 0L }
+        val total1 = prevStat.sum()
+        val total2 = currStat.sum()
 
         val totalDiff = total2 - total1
         val idleDiff = idle2 - idle1
-        if (totalDiff <= 0) 0
+        val usage = if (totalDiff <= 0) 0
         else ((totalDiff - idleDiff) * 100L / totalDiff).toInt().coerceIn(0, 100)
+        Pair(usage, currStat)
     } catch (_: Exception) {
-        0
+        Pair(0, null)
     }
 }
