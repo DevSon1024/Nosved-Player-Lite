@@ -7,6 +7,8 @@ import com.devson.nvplayerlite.model.Video
 import com.devson.nvplayerlite.player.PlayerManager
 import com.devson.nvplayerlite.repository.WatchHistoryRepository
 import com.devson.nvplayerlite.repository.DecoderMode
+import com.nosved.nosvedmedia.media3.DecoderPreference
+import com.nosved.nosvedmedia.media3.DecoderPreferences
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
@@ -145,6 +147,15 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     private val _currentDecoderMode = MutableStateFlow(DecoderMode.HW_PLUS)
     val currentDecoderMode: StateFlow<DecoderMode> = _currentDecoderMode.asStateFlow()
 
+    private val _videoDecoderPreference = MutableStateFlow(DecoderPreference.AUTO)
+    val videoDecoderPreference: StateFlow<DecoderPreference> = _videoDecoderPreference.asStateFlow()
+
+    private val _audioDecoderPreference = MutableStateFlow(DecoderPreference.AUTO)
+    val audioDecoderPreference: StateFlow<DecoderPreference> = _audioDecoderPreference.asStateFlow()
+
+    private val _fallbackHistory = MutableStateFlow<List<String>>(emptyList())
+    val fallbackHistory: StateFlow<List<String>> = _fallbackHistory.asStateFlow()
+
     private val _defaultAudioLang = MutableStateFlow("")
     private val _defaultSubtitleLang = MutableStateFlow("")
 
@@ -163,6 +174,8 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                     _autoPlayEnabled.value = settings.autoPlayEnabled
                     _showSeekButtons.value = settings.showSeekButtons
                     _fastplaySpeed.value = settings.fastplaySpeed
+                    _videoDecoderPreference.value = settings.videoDecoderPreference
+                    _audioDecoderPreference.value = settings.audioDecoderPreference
                     _currentDecoderMode.value = settings.decoderMode
                     _defaultAudioLang.value = settings.defaultAudioLanguage
                     _defaultSubtitleLang.value = settings.defaultSubtitleLanguage
@@ -181,17 +194,43 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         if (playerManager == null) {
+            val initialPrefs = DecoderPreferences(
+                video = _videoDecoderPreference.value,
+                audio = _audioDecoderPreference.value,
+                allowFallback = true
+            )
             playerManager = PlayerManager(context)
             playerManager?.initializePlayer(
                 _currentDecoderMode.value,
                 _defaultAudioLang.value,
-                _defaultSubtitleLang.value
+                _defaultSubtitleLang.value,
+                customPreferences = initialPrefs
             )
             _playerInstance.value = playerManager?.exoPlayer
 
             viewModelScope.launch {
                 playerManager?.isPlaying?.collect { playing ->
                     _playingIntent.value = playing
+                }
+            }
+            viewModelScope.launch {
+                playerManager?.fallbackHistory?.collect { history ->
+                    _fallbackHistory.value = history
+                }
+            }
+
+            playerManager?.onDecoderPreferencesChanged = { prefs ->
+                _videoDecoderPreference.value = prefs.video
+                _audioDecoderPreference.value = prefs.audio
+                val effectiveMode = when {
+                    prefs.video == DecoderPreference.PLATFORM_ONLY && prefs.audio == DecoderPreference.PLATFORM_ONLY -> DecoderMode.HW
+                    prefs.video == DecoderPreference.SOFTWARE_ONLY && prefs.audio == DecoderPreference.SOFTWARE_ONLY -> DecoderMode.SW
+                    else -> DecoderMode.HW_PLUS
+                }
+                _currentDecoderMode.value = effectiveMode
+                _playerInstance.value = playerManager?.exoPlayer
+                viewModelScope.launch {
+                    settingsRepository?.updateDecoderPreferences(prefs.video, prefs.audio)
                 }
             }
 
@@ -248,45 +287,60 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun setDecoderMode(mode: DecoderMode) {
-        if (_currentDecoderMode.value == mode) return
+        val (videoPref, audioPref) = when (mode) {
+            DecoderMode.HW -> Pair(DecoderPreference.PLATFORM_ONLY, DecoderPreference.PLATFORM_ONLY)
+            DecoderMode.HW_PLUS -> Pair(DecoderPreference.PLATFORM_PREFERRED, DecoderPreference.PLATFORM_PREFERRED)
+            DecoderMode.SW -> Pair(DecoderPreference.SOFTWARE_ONLY, DecoderPreference.SOFTWARE_ONLY)
+        }
+        val prefs = DecoderPreferences(
+            video = videoPref,
+            audio = audioPref,
+            allowFallback = mode == DecoderMode.HW_PLUS
+        )
+        _currentDecoderMode.value = mode
+        _videoDecoderPreference.value = videoPref
+        _audioDecoderPreference.value = audioPref
         viewModelScope.launch {
             settingsRepository?.updateDecoderMode(mode)
-            _currentDecoderMode.value = mode
-            val video = _currentVideo.value ?: return@launch
-            val (savedPos, wasPlaying) = playerManager?.releasePlayerAndKeepState() ?: return@launch
-            val posToRestore = if (savedPos > 0L) savedPos else historyRepo.getPosition(video.uri)
-
-            playerManager = PlayerManager(getApplication())
-            playerManager?.initializePlayer(
-                mode,
-                _defaultAudioLang.value,
-                _defaultSubtitleLang.value
-            )
-            playerManager?.onDecoderFallback = { fallbackMode ->
-                setDecoderMode(fallbackMode)
-            }
-            _playerInstance.value = playerManager?.exoPlayer
-            viewModelScope.launch {
-                playerManager?.isPlaying?.collect { playing ->
-                    _playingIntent.value = playing
-                }
-            }
-            playerManager?.onPlayNext = { playNextVideo() }
-            playerManager?.onPlayPrevious = { playPreviousVideo() }
-            playerManager?.onVideoEnded = {
-                val uri = _currentVideo.value?.uri
-                val pos = resolvePositionToSave()
-                if (uri != null && pos > 0L) {
-                    viewModelScope.launch { historyRepo.savePosition(uri, pos) }
-                }
-                if (_autoPlayEnabled.value) playNextVideo()
-            }
-            playerManager?.onPlaybackError = { playNextVideo() }
-            playerManager?.playVideo(video, posToRestore)
-            if (!wasPlaying) {
-                playerManager?.pause()
-            }
         }
+        playerManager?.applyDecoderPreferences(prefs)
+        _playerInstance.value = playerManager?.exoPlayer
+    }
+
+    fun setVideoDecoderPreference(preference: DecoderPreference) {
+        val mode = when (preference) {
+            DecoderPreference.PLATFORM_ONLY -> DecoderMode.HW
+            DecoderPreference.SOFTWARE_ONLY -> DecoderMode.SW
+            else -> DecoderMode.HW_PLUS
+        }
+        setDecoderMode(mode)
+    }
+
+    fun setAudioDecoderPreference(preference: DecoderPreference) {
+        val mode = when (preference) {
+            DecoderPreference.PLATFORM_ONLY -> DecoderMode.HW
+            DecoderPreference.SOFTWARE_ONLY -> DecoderMode.SW
+            else -> DecoderMode.HW_PLUS
+        }
+        setDecoderMode(mode)
+    }
+
+    fun setDecoderPreferences(preferences: DecoderPreferences) {
+        _videoDecoderPreference.value = preferences.video
+        _audioDecoderPreference.value = preferences.audio
+        val effectiveMode = when {
+            preferences.video == DecoderPreference.PLATFORM_ONLY && preferences.audio == DecoderPreference.PLATFORM_ONLY -> DecoderMode.HW
+            preferences.video == DecoderPreference.SOFTWARE_ONLY && preferences.audio == DecoderPreference.SOFTWARE_ONLY -> DecoderMode.SW
+            else -> DecoderMode.HW_PLUS
+        }
+        _currentDecoderMode.value = effectiveMode
+
+        viewModelScope.launch {
+            settingsRepository?.updateDecoderPreferences(preferences.video, preferences.audio)
+        }
+
+        playerManager?.applyDecoderPreferences(preferences)
+        _playerInstance.value = playerManager?.exoPlayer
     }
 
 

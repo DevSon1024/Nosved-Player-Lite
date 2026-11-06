@@ -18,8 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -29,17 +28,45 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.devson.nvplayerlite.repository.DecoderMode
 
+private data class DecoderOptionItem(
+    val mode: DecoderMode,
+    val title: String,
+    val tag: String,
+    val description: String
+)
+
+private val decoderOptions = listOf(
+    DecoderOptionItem(
+        mode = DecoderMode.HW,
+        title = "HW (Hardware Decoder)",
+        tag = "HW",
+        description = "Platform hardware decoding (MediaCodec). Maximum performance and battery efficiency. Software fallback disabled."
+    ),
+    DecoderOptionItem(
+        mode = DecoderMode.HW_PLUS,
+        title = "HW+ (Hardware+ Decoder)",
+        tag = "HW+",
+        description = "Hardware priority with automatic software fallback. Uses platform MediaCodec when supported; seamlessly falls back to dav1d (AV1) or FFmpeg for unsupported formats, 10-bit H.264 Hi10P, or decode errors."
+    ),
+    DecoderOptionItem(
+        mode = DecoderMode.SW,
+        title = "SW (Software Decoder)",
+        tag = "SW",
+        description = "Custom high-performance software decoding via dav1d SIMD (AV1) and FFmpeg 7.1 multi-threaded libavcodec. Highest format compatibility."
+    )
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DecoderSideSheet(
     visible: Boolean,
-    currentMode: DecoderMode,
-    onSelectMode: (DecoderMode) -> Unit,
+    currentMode: DecoderMode = DecoderMode.HW_PLUS,
+    onSelectMode: (DecoderMode) -> Unit = {},
     onDismiss: () -> Unit
 ) {
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-    val sheetWidthPercent = if (isLandscape) 0.48f else 0.85f
+    val sheetWidthPercent = if (isLandscape) 0.52f else 0.88f
 
     BackHandler(enabled = visible) {
         onDismiss()
@@ -134,7 +161,11 @@ fun DecoderSideSheet(
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
-                                    text = "Active: ${currentMode.displayName}",
+                                    text = "Active: ${currentMode.displayName} (${when (currentMode) {
+                                        DecoderMode.HW -> "Hardware Only"
+                                        DecoderMode.HW_PLUS -> "Hardware+ (Auto Fallback)"
+                                        DecoderMode.SW -> "Software Only"
+                                    }})",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -157,9 +188,15 @@ fun DecoderSideSheet(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    SectionHeader(title = "Hardware & Software Decoding")
+                    Text(
+                        text = "DECODER MODE",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.primary,
+                        letterSpacing = 1.sp
+                    )
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
                     // Content list of Decoder options
                     Column(
@@ -167,10 +204,10 @@ fun DecoderSideSheet(
                             .fillMaxSize()
                             .selectableGroup()
                             .verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        DecoderMode.entries.forEach { mode ->
-                            val selected = currentMode == mode
+                        decoderOptions.forEach { item ->
+                            val selected = currentMode == item.mode
                             val containerColor = if (selected) {
                                 MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
                             } else {
@@ -182,21 +219,9 @@ fun DecoderSideSheet(
                                 MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
                             }
 
-                            val modeTag = when (mode) {
-                                DecoderMode.HW -> "HW"
-                                DecoderMode.HW_PLUS -> "HW+"
-                                DecoderMode.SW -> "SW"
-                            }
-
-                            val description = when (mode) {
-                                DecoderMode.HW -> "Hardware decoder using native MediaCodec GPU acceleration"
-                                DecoderMode.HW_PLUS -> "Advanced Hardware+ decoder with direct video surface rendering"
-                                DecoderMode.SW -> "Software CPU decoding fallback for legacy codec compatibility"
-                            }
-
                             Card(
                                 onClick = {
-                                    onSelectMode(mode)
+                                    onSelectMode(item.mode)
                                     onDismiss()
                                 },
                                 shape = RoundedCornerShape(16.dp),
@@ -224,7 +249,7 @@ fun DecoderSideSheet(
                                             )
                                         )
 
-                                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                             Row(
                                                 verticalAlignment = Alignment.CenterVertically,
                                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -235,20 +260,15 @@ fun DecoderSideSheet(
                                                     shape = RoundedCornerShape(6.dp)
                                                 ) {
                                                     Text(
-                                                        text = modeTag,
+                                                        text = item.tag,
                                                         fontSize = 11.sp,
                                                         fontWeight = FontWeight.Black,
                                                         modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
                                                     )
                                                 }
 
-                                                val titleText = when (mode) {
-                                                    DecoderMode.HW -> "Hardware"
-                                                    DecoderMode.HW_PLUS -> "Hardware+"
-                                                    DecoderMode.SW -> "Software"
-                                                }
                                                 Text(
-                                                    text = titleText,
+                                                    text = item.title,
                                                     style = MaterialTheme.typography.titleSmall,
                                                     fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
                                                     color = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
@@ -256,7 +276,7 @@ fun DecoderSideSheet(
                                             }
 
                                             Text(
-                                                text = description,
+                                                text = item.description,
                                                 style = MaterialTheme.typography.bodySmall,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                                             )
@@ -286,4 +306,3 @@ fun DecoderSideSheet(
         }
     }
 }
-

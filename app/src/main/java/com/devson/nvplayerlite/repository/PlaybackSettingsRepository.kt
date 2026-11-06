@@ -12,6 +12,8 @@ import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import com.devson.nvplayerlite.model.AspectMode
+import com.nosved.nosvedmedia.media3.DecoderPreference
+import com.nosved.nosvedmedia.media3.DecoderPreferences
 
 val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "playback_settings")
 
@@ -47,6 +49,8 @@ data class PlaybackSettings(
     val showScreenRotationButton: Boolean = true,
     val pauseWhenObstructed: Boolean = true,
     val showRemainingTime: Boolean = false,
+    val videoDecoderPreference: DecoderPreference = DecoderPreference.AUTO,
+    val audioDecoderPreference: DecoderPreference = DecoderPreference.AUTO,
     val decoderMode: DecoderMode = DecoderMode.HW_PLUS,
     val isAmoledTheme: Boolean = false,
     val defaultAudioLanguage: String = "",
@@ -125,6 +129,8 @@ class PlaybackSettingsRepository(private val context: Context) {
         val SHOW_REMAINING_TIME = booleanPreferencesKey("show_remaining_time")
         val NAV_BAR_TRANSPARENT = booleanPreferencesKey("nav_bar_transparent")
         val DECODER_MODE = stringPreferencesKey("decoder_mode")
+        val VIDEO_DECODER_PREF = stringPreferencesKey("video_decoder_preference")
+        val AUDIO_DECODER_PREF = stringPreferencesKey("audio_decoder_preference")
         val AMOLED_THEME = booleanPreferencesKey("amoled_theme")
         val DEFAULT_AUDIO_LANG = stringPreferencesKey("default_audio_lang")
         val DEFAULT_SUBTITLE_LANG = stringPreferencesKey("default_subtitle_lang")
@@ -175,6 +181,22 @@ class PlaybackSettingsRepository(private val context: Context) {
 
     val playbackSettingsFlow: Flow<PlaybackSettings> = context.dataStore.data
         .map { preferences ->
+            val modeStr = preferences[PreferencesKeys.DECODER_MODE] ?: DecoderMode.HW_PLUS.name
+            val effectiveDecoderMode = try {
+                DecoderMode.valueOf(modeStr)
+            } catch (_: Exception) {
+                DecoderMode.HW_PLUS
+            }
+            val (defaultVideoPref, defaultAudioPref) = when (effectiveDecoderMode) {
+                DecoderMode.HW -> Pair(DecoderPreference.PLATFORM_ONLY, DecoderPreference.PLATFORM_ONLY)
+                DecoderMode.HW_PLUS -> Pair(DecoderPreference.PLATFORM_PREFERRED, DecoderPreference.PLATFORM_PREFERRED)
+                DecoderMode.SW -> Pair(DecoderPreference.SOFTWARE_ONLY, DecoderPreference.SOFTWARE_ONLY)
+            }
+            val videoPref = preferences[PreferencesKeys.VIDEO_DECODER_PREF]?.let { DecoderPreference.fromString(it) }
+                ?: defaultVideoPref
+            val audioPref = preferences[PreferencesKeys.AUDIO_DECODER_PREF]?.let { DecoderPreference.fromString(it) }
+                ?: defaultAudioPref
+
             PlaybackSettings(
                 seekDurationSeconds = preferences[PreferencesKeys.SEEK_DURATION] ?: 10,
                 seekBarStyle = preferences[PreferencesKeys.SEEK_BAR_STYLE] ?: "DEFAULT",
@@ -191,7 +213,9 @@ class PlaybackSettingsRepository(private val context: Context) {
                 showScreenRotationButton = preferences[PreferencesKeys.SHOW_SCREEN_ROTATION_BUTTON] ?: true,
                 pauseWhenObstructed = preferences[PreferencesKeys.PAUSE_WHEN_OBSTRUCTED] ?: true,
                 showRemainingTime = preferences[PreferencesKeys.SHOW_REMAINING_TIME] ?: false,
-                decoderMode = try { DecoderMode.valueOf(preferences[PreferencesKeys.DECODER_MODE] ?: DecoderMode.HW_PLUS.name) } catch (e: Exception) { DecoderMode.HW_PLUS },
+                videoDecoderPreference = videoPref,
+                audioDecoderPreference = audioPref,
+                decoderMode = effectiveDecoderMode,
                 isAmoledTheme = preferences[PreferencesKeys.AMOLED_THEME] ?: false,
                 defaultAudioLanguage = preferences[PreferencesKeys.DEFAULT_AUDIO_LANG] ?: "",
                 defaultSubtitleLanguage = preferences[PreferencesKeys.DEFAULT_SUBTITLE_LANG] ?: "",
@@ -411,7 +435,41 @@ class PlaybackSettingsRepository(private val context: Context) {
     }
 
     suspend fun updateDecoderMode(mode: DecoderMode) {
-        context.dataStore.edit { it[PreferencesKeys.DECODER_MODE] = mode.name }
+        val (videoPref, audioPref) = when (mode) {
+            DecoderMode.HW -> Pair(DecoderPreference.PLATFORM_ONLY, DecoderPreference.PLATFORM_ONLY)
+            DecoderMode.HW_PLUS -> Pair(DecoderPreference.PLATFORM_PREFERRED, DecoderPreference.PLATFORM_PREFERRED)
+            DecoderMode.SW -> Pair(DecoderPreference.SOFTWARE_ONLY, DecoderPreference.SOFTWARE_ONLY)
+        }
+        context.dataStore.edit {
+            it[PreferencesKeys.DECODER_MODE] = mode.name
+            it[PreferencesKeys.VIDEO_DECODER_PREF] = videoPref.name
+            it[PreferencesKeys.AUDIO_DECODER_PREF] = audioPref.name
+        }
+    }
+
+    suspend fun updateVideoDecoderPreference(preference: DecoderPreference) {
+        context.dataStore.edit {
+            it[PreferencesKeys.VIDEO_DECODER_PREF] = preference.name
+        }
+    }
+
+    suspend fun updateAudioDecoderPreference(preference: DecoderPreference) {
+        context.dataStore.edit {
+            it[PreferencesKeys.AUDIO_DECODER_PREF] = preference.name
+        }
+    }
+
+    suspend fun updateDecoderPreferences(video: DecoderPreference, audio: DecoderPreference) {
+        val effectiveMode = when {
+            video == DecoderPreference.PLATFORM_ONLY && audio == DecoderPreference.PLATFORM_ONLY -> DecoderMode.HW
+            video == DecoderPreference.SOFTWARE_ONLY && audio == DecoderPreference.SOFTWARE_ONLY -> DecoderMode.SW
+            else -> DecoderMode.HW_PLUS
+        }
+        context.dataStore.edit {
+            it[PreferencesKeys.DECODER_MODE] = effectiveMode.name
+            it[PreferencesKeys.VIDEO_DECODER_PREF] = video.name
+            it[PreferencesKeys.AUDIO_DECODER_PREF] = audio.name
+        }
     }
 
     val isNavBarTransparentFlow: Flow<Boolean> = context.dataStore.data.map { prefs ->
