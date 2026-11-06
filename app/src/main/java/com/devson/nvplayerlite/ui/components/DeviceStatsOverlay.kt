@@ -77,14 +77,24 @@ data class DecoderInfo(
 )
 
 data class PlaybackStats(
+    // Mode
+    val requestedDecoderMode: String = "Auto (HW+)",
+
     // Video Track
     val videoResolution: String = "N/A",
     val videoCodecMime: String = "N/A",
     val videoCodecFriendly: String = "N/A",
+    val videoProfile: String = "",
+    val videoBitDepth: String = "8-bit",
+    val videoPixelFormat: String = "YUV420P",
     val videoBitrate: String = "N/A",
     val videoFramerate: String = "N/A",
     val videoTracksCount: Int = 0,
     val videoDecoderInfo: DecoderInfo = DecoderInfo("HW", true, "MediaCodec", "Hardware Accelerated Pipeline"),
+    val videoDecoderStateDisplay: String = "Actively Decoding",
+    val fallbackReason: String? = null,
+    val decodeLatencyMs: Double = 0.0,
+    val framesDropped: Long = 0L,
 
     // Audio Track
     val audioCodecMime: String = "N/A",
@@ -96,6 +106,7 @@ data class PlaybackStats(
     val audioTracksCount: Int = 0,
     val audioOtherLanguages: String = "",
     val audioDecoderInfo: DecoderInfo = DecoderInfo("HW", true, "MediaCodec / AudioTrack", "Hardware Accelerated Audio"),
+    val audioDecoderStateDisplay: String = "Actively Decoding",
 
     // Subtitle Track
     val hasActiveSubtitle: Boolean = false,
@@ -126,13 +137,21 @@ fun DeviceStatsOverlay(
     videoDecoderName: String? = null,
     audioDecoderName: String? = null,
     decoderMode: DecoderMode? = null,
+    videoDecoderState: com.nosved.nosvedmedia.media3.DecoderState? = null,
+    audioDecoderState: com.nosved.nosvedmedia.media3.DecoderState? = null,
+    fallbackReason: String? = null,
+    decodeLatencyMs: Double = 0.0,
+    framesDropped: Long = 0L,
     onDismiss: () -> Unit = {}
 ) {
     val context = LocalContext.current
     var deviceStats by remember { mutableStateOf(DeviceStats()) }
     var playbackStats by remember { mutableStateOf(PlaybackStats()) }
 
-    LaunchedEffect(visible, player, videoDecoderName, audioDecoderName, decoderMode) {
+    LaunchedEffect(
+        visible, player, videoDecoderName, audioDecoderName, decoderMode,
+        videoDecoderState, audioDecoderState, fallbackReason, decodeLatencyMs, framesDropped
+    ) {
         if (visible) {
             while (true) {
                 deviceStats = collectStats(context, videoFps)
@@ -142,7 +161,12 @@ fun DeviceStatsOverlay(
                     reportedFps = videoFps,
                     videoDecoderName = videoDecoderName,
                     audioDecoderName = audioDecoderName,
-                    decoderMode = decoderMode
+                    decoderMode = decoderMode,
+                    videoDecoderState = videoDecoderState,
+                    audioDecoderState = audioDecoderState,
+                    fallbackReason = fallbackReason,
+                    decodeLatencyMs = decodeLatencyMs,
+                    framesDropped = framesDropped
                 )
                 delay(1000)
             }
@@ -225,12 +249,27 @@ fun DeviceStatsOverlay(
                     badge = playbackStats.videoDecoderInfo.badge,
                     isHardware = playbackStats.videoDecoderInfo.isHardware
                 )
+                StatItem("Requested Mode", playbackStats.requestedDecoderMode)
                 StatItem("Active Decoder", playbackStats.videoDecoderInfo.decoderName)
+                StatItem("Decoder State", playbackStats.videoDecoderStateDisplay)
                 StatItem("Technology", playbackStats.videoDecoderInfo.technology)
-                StatItem("Codec", "${playbackStats.videoCodecFriendly} (${playbackStats.videoCodecMime})")
+                val profileText = if (playbackStats.videoProfile.isNotBlank()) " ${playbackStats.videoProfile}" else ""
+                StatItem("Codec & Profile", "${playbackStats.videoCodecFriendly}$profileText (${playbackStats.videoCodecMime})")
                 StatItem("Resolution", playbackStats.videoResolution)
                 StatItem("Framerate", playbackStats.videoFramerate)
+                StatItem("Bit Depth", playbackStats.videoBitDepth)
+                StatItem("Pixel Format", playbackStats.videoPixelFormat)
                 StatItem("Bitrate", playbackStats.videoBitrate)
+                val reason = playbackStats.fallbackReason
+                if (!reason.isNullOrBlank()) {
+                    StatItem("Fallback Reason", reason, Color(0xFFFFB74D))
+                }
+                if (playbackStats.decodeLatencyMs > 0.0) {
+                    StatItem("Decode Latency", "%.2f ms".format(playbackStats.decodeLatencyMs))
+                }
+                if (playbackStats.framesDropped > 0L) {
+                    StatItem("Dropped Frames", "${playbackStats.framesDropped} frames", Color(0xFFEF5350))
+                }
                 if (playbackStats.videoTracksCount > 1) {
                     StatItem("Video Streams", "${playbackStats.videoTracksCount} track(s)")
                 }
@@ -245,6 +284,7 @@ fun DeviceStatsOverlay(
                 )
                 StatItem("Active Track", "${playbackStats.audioTrackLabel} (${playbackStats.audioLanguage})")
                 StatItem("Active Decoder", playbackStats.audioDecoderInfo.decoderName)
+                StatItem("Decoder State", playbackStats.audioDecoderStateDisplay)
                 StatItem("Technology", playbackStats.audioDecoderInfo.technology)
                 StatItem("Codec", "${playbackStats.audioCodecFriendly} (${playbackStats.audioCodecMime})")
                 StatItem("Channels", playbackStats.audioChannels)
@@ -621,19 +661,108 @@ private fun memWarningColor(usedMb: Long, totalMb: Long, defaultColor: Color): C
     }
 }
 
+private fun formatDecoderState(state: com.nosved.nosvedmedia.media3.DecoderState?): String {
+    return when (state) {
+        com.nosved.nosvedmedia.media3.DecoderState.PLAYING,
+        com.nosved.nosvedmedia.media3.DecoderState.FIRST_FRAME_DECODED -> "Actively Decoding"
+        com.nosved.nosvedmedia.media3.DecoderState.INITIALIZING,
+        com.nosved.nosvedmedia.media3.DecoderState.INITIALIZED -> "Initialized"
+        com.nosved.nosvedmedia.media3.DecoderState.REQUESTED,
+        com.nosved.nosvedmedia.media3.DecoderState.CANDIDATE_SELECTED -> "Advertised"
+        com.nosved.nosvedmedia.media3.DecoderState.FALLBACK_PENDING -> "Fallback Pending"
+        com.nosved.nosvedmedia.media3.DecoderState.FAILED -> "Failed"
+        com.nosved.nosvedmedia.media3.DecoderState.RELEASED -> "Released"
+        com.nosved.nosvedmedia.media3.DecoderState.IDLE, null -> "Idle"
+    }
+}
+
+private fun extractProfile(format: Format): String {
+    val codecs = format.codecs?.lowercase() ?: ""
+    val mime = format.sampleMimeType?.lowercase() ?: ""
+
+    return when {
+        mime.contains("hevc") || mime.contains("h265") -> {
+            if (codecs.contains("hev1.2") || codecs.contains("hvc1.2") || codecs.contains("main10")) {
+                "Main 10"
+            } else {
+                "Main"
+            }
+        }
+        mime.contains("avc") || mime.contains("h264") -> {
+            if (codecs.contains("6400")) "High"
+            else if (codecs.contains("4d40")) "Main"
+            else if (codecs.contains("42e0") || codecs.contains("4280")) "Baseline"
+            else if (codecs.contains("6e00") || codecs.contains("7a00")) "High 10"
+            else "Main"
+        }
+        mime.contains("vp9") -> {
+            if (codecs.contains("vp09.02") || codecs.contains("vp09.2")) "Profile 2 (10-bit)"
+            else "Profile 0 (8-bit)"
+        }
+        mime.contains("av01") || mime.contains("av1") -> {
+            if (codecs.contains("av01.0.10") || codecs.contains(".10m")) "Main 10"
+            else "Main 8"
+        }
+        else -> ""
+    }
+}
+
+private fun extractBitDepth(format: Format): String {
+    val colorInfo = format.colorInfo
+    if (colorInfo != null) {
+        if (colorInfo.colorTransfer == C.COLOR_TRANSFER_ST2084 ||
+            colorInfo.colorTransfer == C.COLOR_TRANSFER_HLG
+        ) {
+            return "10-bit"
+        }
+    }
+    val codecs = format.codecs?.lowercase() ?: ""
+    if (codecs.contains("hev1.2") || codecs.contains("hvc1.2") ||
+        codecs.contains("main10") || codecs.contains("vp09.02")
+    ) {
+        return "10-bit"
+    }
+    return "8-bit"
+}
+
+private fun extractPixelFormat(format: Format): String {
+    val is10Bit = extractBitDepth(format) == "10-bit"
+    val colorInfo = format.colorInfo
+    val transfer = when (colorInfo?.colorTransfer) {
+        C.COLOR_TRANSFER_ST2084 -> "PQ"
+        C.COLOR_TRANSFER_HLG -> "HLG"
+        C.COLOR_TRANSFER_SDR -> "SDR"
+        else -> if (is10Bit) "PQ" else "SDR"
+    }
+    val space = when (colorInfo?.colorSpace) {
+        C.COLOR_SPACE_BT2020 -> "BT.2020"
+        C.COLOR_SPACE_BT709 -> "BT.709"
+        C.COLOR_SPACE_BT601 -> "BT.601"
+        else -> if (is10Bit) "BT.2020" else "BT.709"
+    }
+    val pixFmt = if (is10Bit) "YUV420P10LE" else "YUV420P"
+    return "$pixFmt ($space $transfer)"
+}
+
 private fun collectPlaybackStats(
     player: Player?,
     context: Context,
     reportedFps: Float,
     videoDecoderName: String?,
     audioDecoderName: String?,
-    decoderMode: DecoderMode?
+    decoderMode: DecoderMode?,
+    videoDecoderState: com.nosved.nosvedmedia.media3.DecoderState? = null,
+    audioDecoderState: com.nosved.nosvedmedia.media3.DecoderState? = null,
+    fallbackReason: String? = null,
+    decodeLatencyMs: Double = 0.0,
+    framesDropped: Long = 0L
 ): PlaybackStats {
     var vRes = "N/A"
     var vMime = "N/A"
     var vBitrate = "N/A"
     var formatFps = 0f
     var videoCount = 0
+    var selectedVideoFormat: Format? = null
 
     var aMime = "N/A"
     var aSampleRate = "N/A"
@@ -657,6 +786,7 @@ private fun collectPlaybackStats(
                 for (i in 0 until group.length) {
                     if (group.isTrackSelected(i)) {
                         val format = group.getTrackFormat(i)
+                        selectedVideoFormat = format
                         vRes = if (format.width != Format.NO_VALUE && format.height != Format.NO_VALUE) {
                             "${format.width}x${format.height}"
                         } else "N/A"
@@ -733,14 +863,33 @@ private fun collectPlaybackStats(
     val vDecInfo = parseVideoDecoder(videoDecoderName, vMime, decoderMode)
     val aDecInfo = parseAudioDecoder(audioDecoderName, aMime, decoderMode)
 
+    val reqModeStr = when (decoderMode) {
+        DecoderMode.SW -> "Software Only (SW)"
+        DecoderMode.HW -> "Hardware Only (HW)"
+        else -> "Auto (HW+)"
+    }
+    val vProfile = if (selectedVideoFormat != null) extractProfile(selectedVideoFormat) else ""
+    val vBitDepth = if (selectedVideoFormat != null) extractBitDepth(selectedVideoFormat) else "8-bit"
+    val vPixelFmt = if (selectedVideoFormat != null) extractPixelFormat(selectedVideoFormat) else "YUV420P"
+    val vStateDisplay = formatDecoderState(videoDecoderState)
+    val aStateDisplay = formatDecoderState(audioDecoderState)
+
     return PlaybackStats(
+        requestedDecoderMode = reqModeStr,
         videoResolution = vRes,
         videoCodecMime = vMime,
         videoCodecFriendly = friendlyVideoCodec(vMime),
+        videoProfile = vProfile,
+        videoBitDepth = vBitDepth,
+        videoPixelFormat = vPixelFmt,
         videoBitrate = vBitrate,
         videoFramerate = fpsStr,
         videoTracksCount = videoCount,
         videoDecoderInfo = vDecInfo,
+        videoDecoderStateDisplay = vStateDisplay,
+        fallbackReason = fallbackReason,
+        decodeLatencyMs = decodeLatencyMs,
+        framesDropped = framesDropped,
 
         audioCodecMime = aMime,
         audioCodecFriendly = friendlyAudioCodec(aMime),
@@ -751,6 +900,7 @@ private fun collectPlaybackStats(
         audioTracksCount = audioCount,
         audioOtherLanguages = audioLangs.filter { it != aLang }.joinToString(", "),
         audioDecoderInfo = aDecInfo,
+        audioDecoderStateDisplay = aStateDisplay,
 
         hasActiveSubtitle = hasSub,
         subtitleCodecMime = sMime,

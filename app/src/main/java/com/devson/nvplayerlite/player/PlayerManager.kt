@@ -150,6 +150,15 @@ class PlayerManager(private val context: Context) {
     private val _audioDecoderState = MutableStateFlow(DecoderState.IDLE)
     val audioDecoderState: StateFlow<DecoderState> = _audioDecoderState.asStateFlow()
 
+    private val _fallbackReason = MutableStateFlow<String?>(null)
+    val fallbackReason: StateFlow<String?> = _fallbackReason.asStateFlow()
+
+    private val _averageDecodeLatencyMs = MutableStateFlow(0.0)
+    val averageDecodeLatencyMs: StateFlow<Double> = _averageDecodeLatencyMs.asStateFlow()
+
+    private val _framesDropped = MutableStateFlow(0L)
+    val framesDropped: StateFlow<Long> = _framesDropped.asStateFlow()
+
     @Volatile private var pendingHwVideoDecoderName: String? = null
     @Volatile private var pendingHwAudioDecoderName: String? = null
     @Volatile private var lastStructuredError: StructuredPlaybackError? = null
@@ -263,6 +272,9 @@ class PlayerManager(private val context: Context) {
                 setDiagnosticsListener(object : PlaybackDiagnosticsListener {
                     override fun onDecoderStateChanged(status: TrackDecoderStatus) {
                         AppLogger.log("DiagnosticsListener: track=${status.trackType} state=${status.state} engine=${status.actualDecoderEngine}")
+                        if (status.fallbackReason != null) {
+                            _fallbackReason.value = status.fallbackReason
+                        }
                         if (status.trackType == TrackType.VIDEO) {
                             _videoDecoderState.value = status.state
                             if (status.isActivelyDecoding && status.actualDecoderEngine != null) {
@@ -291,6 +303,8 @@ class PlayerManager(private val context: Context) {
                         if (metrics.currentFps > 0.0) {
                             _videoFps.value = metrics.currentFps.toFloat()
                         }
+                        _averageDecodeLatencyMs.value = metrics.averageDecodeTimeMs
+                        _framesDropped.value = metrics.totalFramesDropped
                     }
 
                     override fun onStructuredError(error: StructuredPlaybackError) {
@@ -880,6 +894,9 @@ class PlayerManager(private val context: Context) {
         _audioDecoderName.value = null
         _videoDecoderState.value = DecoderState.IDLE
         _audioDecoderState.value = DecoderState.IDLE
+        _fallbackReason.value = null
+        _averageDecodeLatencyMs.value = 0.0
+        _framesDropped.value = 0L
         _videoFps.value = 0f
         _chapters.value = emptyList()
         val mediaItem = MediaItem.fromUri(video.uri)
@@ -988,6 +1005,9 @@ class PlayerManager(private val context: Context) {
         _audioDecoderName.value = null
         _videoDecoderState.value = DecoderState.RELEASED
         _audioDecoderState.value = DecoderState.RELEASED
+        _fallbackReason.value = null
+        _averageDecodeLatencyMs.value = 0.0
+        _framesDropped.value = 0L
         _videoFps.value = 0f
         mediaSession?.release()
         mediaSession = null

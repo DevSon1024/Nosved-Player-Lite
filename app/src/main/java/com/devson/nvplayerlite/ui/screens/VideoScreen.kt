@@ -107,6 +107,11 @@ fun VideoScreen(
     val videoFps by (viewModel.videoFps ?: kotlinx.coroutines.flow.flowOf(0f)).collectAsState(initial = 0f)
     val videoDecoderName by (viewModel.videoDecoderName ?: kotlinx.coroutines.flow.flowOf(null)).collectAsState(initial = null)
     val audioDecoderName by (viewModel.audioDecoderName ?: kotlinx.coroutines.flow.flowOf(null)).collectAsState(initial = null)
+    val videoDecoderState by (viewModel.videoDecoderState ?: kotlinx.coroutines.flow.flowOf(com.nosved.nosvedmedia.media3.DecoderState.IDLE)).collectAsState(initial = com.nosved.nosvedmedia.media3.DecoderState.IDLE)
+    val audioDecoderState by (viewModel.audioDecoderState ?: kotlinx.coroutines.flow.flowOf(com.nosved.nosvedmedia.media3.DecoderState.IDLE)).collectAsState(initial = com.nosved.nosvedmedia.media3.DecoderState.IDLE)
+    val fallbackReason by (viewModel.fallbackReason ?: kotlinx.coroutines.flow.flowOf(null)).collectAsState(initial = null)
+    val decodeLatencyMs by (viewModel.averageDecodeLatencyMs ?: kotlinx.coroutines.flow.flowOf(0.0)).collectAsState(initial = 0.0)
+    val framesDropped by (viewModel.framesDropped ?: kotlinx.coroutines.flow.flowOf(0L)).collectAsState(initial = 0L)
 
     val controlsVisible by viewModel.controlsVisible.collectAsState()
     val currentVideo by viewModel.currentVideo.collectAsState()
@@ -617,6 +622,11 @@ fun VideoScreen(
             videoDecoderName = videoDecoderName,
             audioDecoderName = audioDecoderName,
             decoderMode = currentDecoder,
+            videoDecoderState = videoDecoderState,
+            audioDecoderState = audioDecoderState,
+            fallbackReason = fallbackReason,
+            decodeLatencyMs = decodeLatencyMs,
+            framesDropped = framesDropped,
             onDismiss = {
                 viewModel.setShowStats(false)
                 settingsViewModel.updateShowStatsOverlay(false)
