@@ -26,6 +26,22 @@ import com.devson.nvplayerlite.model.LanguageList
 import com.devson.nvplayerlite.ui.components.sheets.LanguagePickerSheet
 import com.devson.nvplayerlite.viewmodel.SettingsViewModel
 
+// Pre-cached static option lists to eliminate per-recomposition allocations
+private val orientationOptions = OrientationMode.entries.map { it.name }
+private val fullScreenOptions = FullScreenMode.entries.map { it.name }
+private val softButtonOptions = SoftButtonMode.entries.map { it.name }
+private val playbackControlPositionOptions = listOf("Center", "Below Seekbar")
+private val controlIconSizeOptions = listOf("Small", "Medium", "Large")
+private val seekBarStyleOptions = listOf("Standard", "Thick", "Slim", "Wavy")
+
+@Immutable
+private data class RadioDialogData(
+    val title: String,
+    val options: List<String>,
+    val selectedOption: String,
+    val onOptionSelected: (String) -> Unit
+)
+
 // Maps raw enum names to user-readable labels
 private fun String.toDisplayLabel(): String = this
     .replace('_', ' ')
@@ -45,6 +61,7 @@ fun PlayerScreen(
 
     var showAudioPicker by remember { mutableStateOf(false) }
     var showSubtitlePicker by remember { mutableStateOf(false) }
+    var activeRadioDialog by remember { mutableStateOf<RadioDialogData?>(null) }
 
     Scaffold(
         topBar = {
@@ -77,10 +94,10 @@ fun PlayerScreen(
                 bottom = padding.calculateBottomPadding() + 32.dp
             )
         ) {
-            item { Spacer(Modifier.height(8.dp)) }
+            item(key = "spacer_top") { Spacer(Modifier.height(8.dp)) }
 
-            item { SettingsSectionLabel("Control Regions Layout Customization") }
-            item {
+            item(key = "label_layout") { SettingsSectionLabel("Control Regions Layout Customization") }
+            item(key = "card_layout") {
                 SettingsCard {
                     SettingsClickRow(
                         icon = Icons.Default.Dashboard,
@@ -92,17 +109,23 @@ fun PlayerScreen(
                 Spacer(Modifier.height(16.dp))
             }
 
-            item { SettingsSectionLabel("Player Control Settings") }
-            item {
+            item(key = "label_display_settings") { SettingsSectionLabel("Display & Interface Controls") }
+            item(key = "card_display_settings") {
                 SettingsCard {
                     SettingsRadioItem(
                         icon = Icons.Default.ScreenRotation,
                         title = "Orientation Mode",
                         subtitle = "How the video orientation behaves",
-                        options = OrientationMode.values().map { it.name },
                         selectedOption = playbackSettings.orientationMode.name,
-                        onOptionSelected = {
-                            settingsViewModel.updateOrientationMode(OrientationMode.valueOf(it))
+                        onClick = {
+                            activeRadioDialog = RadioDialogData(
+                                title = "Orientation Mode",
+                                options = orientationOptions,
+                                selectedOption = playbackSettings.orientationMode.name,
+                                onOptionSelected = {
+                                    settingsViewModel.updateOrientationMode(OrientationMode.valueOf(it))
+                                }
+                            )
                         }
                     )
                     SettingsDivider()
@@ -110,10 +133,16 @@ fun PlayerScreen(
                         icon = Icons.Default.Fullscreen,
                         title = "Full Screen Mode",
                         subtitle = "Full screen behaviour during playback",
-                        options = FullScreenMode.values().map { it.name },
                         selectedOption = playbackSettings.fullScreenMode.name,
-                        onOptionSelected = {
-                            settingsViewModel.updateFullScreenMode(FullScreenMode.valueOf(it))
+                        onClick = {
+                            activeRadioDialog = RadioDialogData(
+                                title = "Full Screen Mode",
+                                options = fullScreenOptions,
+                                selectedOption = playbackSettings.fullScreenMode.name,
+                                onOptionSelected = {
+                                    settingsViewModel.updateFullScreenMode(FullScreenMode.valueOf(it))
+                                }
+                            )
                         }
                     )
                     SettingsDivider()
@@ -121,10 +150,16 @@ fun PlayerScreen(
                         icon = Icons.Default.SmartButton,
                         title = "Soft Button",
                         subtitle = "Configure on-screen soft buttons",
-                        options = SoftButtonMode.values().map { it.name },
                         selectedOption = playbackSettings.softButtonMode.name,
-                        onOptionSelected = {
-                            settingsViewModel.updateSoftButtonMode(SoftButtonMode.valueOf(it))
+                        onClick = {
+                            activeRadioDialog = RadioDialogData(
+                                title = "Soft Button",
+                                options = softButtonOptions,
+                                selectedOption = playbackSettings.softButtonMode.name,
+                                onOptionSelected = {
+                                    settingsViewModel.updateSoftButtonMode(SoftButtonMode.valueOf(it))
+                                }
+                            )
                         }
                     )
                     SettingsDivider()
@@ -132,10 +167,16 @@ fun PlayerScreen(
                         icon = Icons.Default.PlayCircle,
                         title = "Playback Control Position",
                         subtitle = if (playbackSettings.isBottomLayoutEnabled) "Below Seekbar" else "Center",
-                        options = listOf("Center", "Below Seekbar"),
                         selectedOption = if (playbackSettings.isBottomLayoutEnabled) "Below Seekbar" else "Center",
-                        onOptionSelected = {
-                            settingsViewModel.updateIsBottomLayoutEnabled(it == "Below Seekbar")
+                        onClick = {
+                            activeRadioDialog = RadioDialogData(
+                                title = "Playback Control Position",
+                                options = playbackControlPositionOptions,
+                                selectedOption = if (playbackSettings.isBottomLayoutEnabled) "Below Seekbar" else "Center",
+                                onOptionSelected = {
+                                    settingsViewModel.updateIsBottomLayoutEnabled(it == "Below Seekbar")
+                                }
+                            )
                         }
                     )
                     SettingsDivider()
@@ -143,10 +184,16 @@ fun PlayerScreen(
                         icon = Icons.Default.PhotoSizeSelectLarge,
                         title = "Controls Icon Size",
                         subtitle = "Scale size of player control buttons",
-                        options = listOf("Small", "Medium", "Large"),
                         selectedOption = playbackSettings.controlIconSize.lowercase().replaceFirstChar { it.uppercase() },
-                        onOptionSelected = {
-                            settingsViewModel.updateControlIconSize(it.lowercase())
+                        onClick = {
+                            activeRadioDialog = RadioDialogData(
+                                title = "Controls Icon Size",
+                                options = controlIconSizeOptions,
+                                selectedOption = playbackSettings.controlIconSize.lowercase().replaceFirstChar { it.uppercase() },
+                                onOptionSelected = {
+                                    settingsViewModel.updateControlIconSize(it.lowercase())
+                                }
+                            )
                         }
                     )
                     SettingsDivider()
@@ -154,13 +201,25 @@ fun PlayerScreen(
                         icon = Icons.Default.Waves,
                         title = "Seekbar Style",
                         subtitle = "Visual design of the playback progress bar",
-                        options = listOf("Standard", "Thick", "Slim", "Wavy"),
                         selectedOption = playbackSettings.seekBarStyle.lowercase().replaceFirstChar { it.uppercase() },
-                        onOptionSelected = {
-                            settingsViewModel.updateSeekBarStyle(it.lowercase())
+                        onClick = {
+                            activeRadioDialog = RadioDialogData(
+                                title = "Seekbar Style",
+                                options = seekBarStyleOptions,
+                                selectedOption = playbackSettings.seekBarStyle.lowercase().replaceFirstChar { it.uppercase() },
+                                onOptionSelected = {
+                                    settingsViewModel.updateSeekBarStyle(it.lowercase())
+                                }
+                            )
                         }
                     )
-                    SettingsDivider()
+                }
+                Spacer(Modifier.height(16.dp))
+            }
+
+            item(key = "label_playback_buttons") { SettingsSectionLabel("Playback Buttons & Actions") }
+            item(key = "card_playback_buttons") {
+                SettingsCard {
                     SettingsToggleRow(
                         icon = Icons.Default.SkipNext,
                         title = "Auto-play Next Video",
@@ -212,8 +271,8 @@ fun PlayerScreen(
                 Spacer(Modifier.height(16.dp))
             }
 
-            item { SettingsSectionLabel("Video Player Overlays") }
-            item {
+            item(key = "label_overlays") { SettingsSectionLabel("Video Player Overlays") }
+            item(key = "card_overlays") {
                 SettingsCard {
                     SettingsToggleRow(
                         icon = Icons.Default.Timer,
@@ -242,8 +301,8 @@ fun PlayerScreen(
                 Spacer(Modifier.height(16.dp))
             }
 
-            item { SettingsSectionLabel("Playback Behavior") }
-            item {
+            item(key = "label_behavior") { SettingsSectionLabel("Playback Behavior") }
+            item(key = "card_behavior") {
                 SettingsCard {
                     SettingsToggleRow(
                         icon = Icons.Default.ScreenRotationAlt,
@@ -263,9 +322,9 @@ fun PlayerScreen(
                 }
             }
 
-            item { Spacer(Modifier.height(16.dp)) }
-            item { SettingsSectionLabel("Default Track Languages") }
-            item {
+            item(key = "spacer_behavior_lang") { Spacer(Modifier.height(16.dp)) }
+            item(key = "label_languages") { SettingsSectionLabel("Default Track Languages") }
+            item(key = "card_languages") {
                 SettingsCard {
                     SettingsClickRow(
                         icon     = Icons.Default.Headset,
@@ -303,6 +362,19 @@ fun PlayerScreen(
                 }
             }
         }
+    }
+
+    activeRadioDialog?.let { data ->
+        RadioPickerDialog(
+            title = data.title,
+            options = data.options,
+            selectedOption = data.selectedOption,
+            onOptionSelected = {
+                data.onOptionSelected(it)
+                activeRadioDialog = null
+            },
+            onDismiss = { activeRadioDialog = null }
+        )
     }
 
     if (showAudioPicker) {
@@ -448,16 +520,13 @@ private fun SettingsRadioItem(
     icon: ImageVector,
     title: String,
     subtitle: String,
-    options: List<String>,
     selectedOption: String,
-    onOptionSelected: (String) -> Unit
+    onClick: () -> Unit
 ) {
-    var showDialog by remember { mutableStateOf(false) }
-
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { showDialog = true }
+            .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(16.dp)
@@ -498,19 +567,6 @@ private fun SettingsRadioItem(
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(20.dp)
-        )
-    }
-
-    if (showDialog) {
-        RadioPickerDialog(
-            title = title,
-            options = options,
-            selectedOption = selectedOption,
-            onOptionSelected = {
-                onOptionSelected(it)
-                showDialog = false
-            },
-            onDismiss = { showDialog = false }
         )
     }
 }

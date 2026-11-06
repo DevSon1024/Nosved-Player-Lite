@@ -8,25 +8,26 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
-import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Audiotrack
+import androidx.compose.material.icons.filled.ClosedCaption
 import androidx.compose.material.icons.filled.Crop
 import androidx.compose.material.icons.filled.FastForward
 import androidx.compose.material.icons.filled.FastRewind
@@ -38,36 +39,33 @@ import androidx.compose.material.icons.filled.PictureInPictureAlt
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.ScreenRotation
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
-import androidx.compose.material.icons.filled.Audiotrack
-import androidx.compose.material.icons.filled.ClosedCaption
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TooltipBox
-import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.devson.nvplayerlite.repository.DecoderMode
 import com.devson.nvplayerlite.viewmodel.ControlIconSize
 import com.devson.nvplayerlite.viewmodel.SeekBarStyle
-import com.devson.nvplayerlite.repository.DecoderMode
 import kotlinx.coroutines.launch
 
 // Icon size helpers
@@ -109,8 +107,9 @@ fun PlayerControls(
     isVisible: Boolean,
     isPlaying: Boolean,
     title: String,
-    currentPosition: Long,
+    currentPosition: Long = 0L,
     duration: Long,
+    currentPositionProvider: (() -> Long)? = null,
     videoUri: Uri? = null,
     onPlayPauseToggle: () -> Unit,
     onSeekTo: (Long) -> Unit,
@@ -162,6 +161,9 @@ fun PlayerControls(
     var showDecoderDialog by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
+    val activeControlSize = if (isLandscape) controlIconSize else ControlIconSize.SMALL
+
+    val effectivePositionProvider = currentPositionProvider ?: { currentPosition }
 
     AnimatedVisibility(
         visible = isVisible,
@@ -170,446 +172,81 @@ fun PlayerControls(
         modifier = modifier.fillMaxSize()
     ) {
         if (isLocked) {
-            Box(modifier = Modifier.fillMaxSize()) {
-                Column(
-                    modifier = Modifier
-                        .align(Alignment.CenterStart)
-                        .padding(start = 32.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    IconButton(
-                        onClick = onToggleLock,
-                        modifier = Modifier
-                            .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
-                    ) {
-                        Icon(Icons.Filled.Lock, contentDescription = "Unlock Controls", tint = Color.White)
-                    }
-                    if (showScreenRotationButton && onToggleScreenRotation != null) {
-                        IconButton(
-                            onClick = onToggleScreenRotation,
-                            modifier = Modifier
-                                .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
-                        ) {
-                            Icon(Icons.Filled.ScreenRotation, contentDescription = "Rotate Screen", tint = Color.White)
-                        }
-                    }
-                }
-            }
+            PlayerLockedOverlay(
+                onToggleLock = onToggleLock,
+                showScreenRotationButton = showScreenRotationButton,
+                onToggleScreenRotation = onToggleScreenRotation
+            )
         } else {
-            Box(
-                modifier = Modifier.fillMaxSize()
-            ) {
-                // Side Controls: Rotate
-                Column(
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(start = 12.dp, top = 52.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                // Side Controls
+                PlayerSideControls(
+                    showScreenRotationButton = showScreenRotationButton,
+                    onToggleScreenRotation = onToggleScreenRotation,
+                    onSpeedMenuClick = onSpeedMenuClick
+                )
 
-                    if (showScreenRotationButton && onToggleScreenRotation != null) {
-                        IconButton(
-                            onClick = onToggleScreenRotation,
-                            modifier = Modifier.size(36.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.ScreenRotation,
-                                contentDescription = "Rotate Screen",
-                                tint = Color.White,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                    }
-                }
+                // Top Panel
+                PlayerControlsTopBar(
+                    title = title,
+                    onBack = onBack,
+                    onTitleClick = onTitleClick,
+                    onInfoClick = onInfoClick,
+                    onOpenAudioTracks = onOpenAudioTracks,
+                    onOpenSubtitles = onOpenSubtitles,
+                    onPipToggle = onPipToggle,
+                    currentDecoder = currentDecoder,
+                    onShowDecoderDialog = { showDecoderDialog = true },
+                    onOpenSettingsSheet = {
+                        scope.launch { sheetState.show() }
+                        showSettingsSheet = true
+                    },
+                    modifier = Modifier.align(Alignment.TopCenter)
+                )
 
-                // Right Side Controls
-                Column(
+                // Bottom Panel (Timeline + Controls)
+                Box(
                     modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(end = 12.dp, top = 52.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    if (onSpeedMenuClick != null) {
-                        IconButton(
-                            onClick = onSpeedMenuClick,
-                            modifier = Modifier.size(36.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.Speed,
-                                contentDescription = "Playback Speed",
-                                tint = Color.White,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                    }
-                }
-
-            //  Top gradient 
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.75f), Color.Transparent)))
-                    .align(Alignment.TopCenter)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Vertical))
                         .fillMaxWidth()
-                        .padding(horizontal = 4.dp, vertical = 2.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    if (onBack != null) {
-                        TooltipBox(
-                            positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
-                            tooltip = { PlainTooltip { Text("Back") } },
-                            state = rememberTooltipState()
-                        ) {
-                            IconButton(onClick = onBack) {
-                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
-                            }
-                        }
-                    } else {
-                        Spacer(Modifier.width(8.dp))
-                    }                    
-                    Text(
-                        text = title,
-                        color = Color.White,
-                        style = MaterialTheme.typography.titleMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier
-                            .weight(1f)
-                            .then(
-                                if (onTitleClick != null) Modifier.clickable { onTitleClick() } else Modifier
-                            )
-                    )
-                    TooltipBox(
-                        positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
-                        tooltip = { PlainTooltip { Text("Video Info") } },
-                        state = rememberTooltipState()
-                    ) {
-                        IconButton(onClick = { onInfoClick?.invoke() }) {
-                            Icon(
-                                imageVector = Icons.Filled.Info,
-                                contentDescription = "Video Info",
-                                tint = Color.White
-                            )
-                        }
-                    }
-                    if (onOpenAudioTracks != null) {
-                        TooltipBox(
-                            positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
-                            tooltip = { PlainTooltip { Text("Audio Tracks") } },
-                            state = rememberTooltipState()
-                        ) {
-                            IconButton(onClick = onOpenAudioTracks) {
-                                Icon(Icons.Filled.Audiotrack, contentDescription = "Audio Tracks", tint = Color.White)
-                            }
-                        }
-                    }
-                    if (onOpenSubtitles != null) {
-                        TooltipBox(
-                            positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
-                            tooltip = { PlainTooltip { Text("Subtitles") } },
-                            state = rememberTooltipState()
-                        ) {
-                            IconButton(onClick = onOpenSubtitles) {
-                                Icon(Icons.Filled.ClosedCaption, contentDescription = "Subtitles", tint = Color.White)
-                            }
-                        }
-                    }
-
-                    if (onPipToggle != null) {
-                        TooltipBox(
-                            positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
-                            tooltip = { PlainTooltip { Text("Picture in Picture") } },
-                            state = rememberTooltipState()
-                        ) {
-                            IconButton(onClick = onPipToggle) {
-                                Icon(Icons.Filled.PictureInPictureAlt, contentDescription = "Picture in Picture", tint = Color.White)
-                            }
-                        }
-                    }
-                    if (onSelectDecoder != null) {
-                        TooltipBox(
-                            positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
-                            tooltip = { PlainTooltip { Text("Decoder: ${currentDecoder.displayName}") } },
-                            state = rememberTooltipState()
-                        ) {
-                            IconButton(onClick = { showDecoderDialog = true }) {
-                                Text(
-                                    text = currentDecoder.displayName,
-                                    color = Color.White,
-                                    style = MaterialTheme.typography.labelLarge
-                                )
-                            }
-                        }
-                    }
-                    TooltipBox(
-                        positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
-                        tooltip = { PlainTooltip { Text("Playback Settings") } },
-                        state = rememberTooltipState()
-                    ) {
-                        IconButton(onClick = {
-                            scope.launch { sheetState.show() }
-                            showSettingsSheet = true
-                        }) {
-                            Icon(
-                                imageVector = Icons.Filled.Settings,
-                                contentDescription = "Playback Settings",
-                                tint = Color.White
-                            )
-                        }
-                    }
-                    Spacer(Modifier.width(4.dp))
-                }
-            }
-
-            //  Bottom gradient + seekbar + controls 
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.8f))))
-                    .align(Alignment.BottomCenter)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Vertical))
-                        .fillMaxWidth()
+                        .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.8f))))
                         .align(Alignment.BottomCenter)
-                        .padding(horizontal = 16.dp, vertical = 0.dp),
-                    verticalArrangement = Arrangement.spacedBy(0.dp)
                 ) {
-                    var sliderPosition by remember { mutableFloatStateOf(currentPosition.toFloat()) }
-                    var isDragging by remember { mutableStateOf(false) }
-                    var draggingJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
-
-                    LaunchedEffect(currentPosition) {
-                        if (!isDragging) sliderPosition = currentPosition.toFloat()
-                    }
-
-                    val effectivePosition = if (isDragging) sliderPosition.toLong() else currentPosition
-
-                    val safeDuration = if (duration > 0) duration.toFloat() else 100f
-                    val safeValueRange = 0f..safeDuration
-                    val safeSliderPosition = sliderPosition.coerceIn(0f, safeDuration)
-
-                    // Row 1: Time + Seekbar + Time
-                    Row(
-                        modifier = Modifier.fillMaxWidth().offset(y = (-6).dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            formatTime(effectivePosition),
-                            color = Color.White,
-                            style = MaterialTheme.typography.labelMedium
-                        )
-                        Spacer(Modifier.width(8.dp))
-
-                        if (seekBarStyle == SeekBarStyle.FLAT) {
-                            FlatSeekBar(
-                                value = safeSliderPosition,
-                                valueRange = safeValueRange,
-                                onValueChange = {
-                                    draggingJob?.cancel()
-                                    if (!isDragging) onScrubbingModeChange(true)
-                                    isDragging = true
-                                    sliderPosition = it
-                                },
-                                onValueChangeFinished = {
-                                    onSeekTo(sliderPosition.toLong())
-                                    onScrubbingModeChange(false)
-                                    draggingJob = scope.launch {
-                                        kotlinx.coroutines.delay(300)
-                                        isDragging = false
-                                    }
-                                },
-                                modifier = Modifier.weight(1f)
-                            )
-                        } else {
-                            Slider(
-                                value = safeSliderPosition,
-                                onValueChange = {
-                                    draggingJob?.cancel()
-                                    if (!isDragging) onScrubbingModeChange(true)
-                                    isDragging = true
-                                    sliderPosition = it
-                                },
-                                onValueChangeFinished = {
-                                    onSeekTo(sliderPosition.toLong())
-                                    onScrubbingModeChange(false)
-                                    draggingJob = scope.launch {
-                                        kotlinx.coroutines.delay(300)
-                                        isDragging = false
-                                    }
-                                },
-                                valueRange = safeValueRange,
-                                modifier = Modifier.weight(1f),
-                                colors = SliderDefaults.colors(
-                                    thumbColor = Color.White,
-                                    activeTrackColor = MaterialTheme.colorScheme.primary,
-                                    inactiveTrackColor = Color.White.copy(alpha = 0.4f)
-                                )
-                            )
-                        }
-
-                        Spacer(Modifier.width(8.dp))
-                        val remaining = if (duration > effectivePosition) duration - effectivePosition else 0L
-                        Text(
-                            text = if (showRemainingTime) "-" + formatTime(remaining) else formatTime(duration),
-                            color = Color.White,
-                            style = MaterialTheme.typography.labelMedium,
-                            modifier = Modifier.clickable { onShowRemainingTimeChange?.invoke(!showRemainingTime) }
-                        )
-                    }
-
-                    // Row 2: Lock | Rewind + Play + Forward | Resize
-                    val activeControlSize = if (isLandscape) controlIconSize else ControlIconSize.SMALL
-                    Row(
+                    Column(
                         modifier = Modifier
+                            .windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Vertical))
                             .fillMaxWidth()
-                            .offset(y = (-12).dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                            .align(Alignment.BottomCenter)
+                            .padding(horizontal = 16.dp, vertical = 0.dp),
+                        verticalArrangement = Arrangement.spacedBy(0.dp)
                     ) {
-                        Box(modifier = Modifier.weight(0.15f), contentAlignment = Alignment.CenterStart) {
-                             TooltipBox(
-                                positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
-                                tooltip = { PlainTooltip { Text("Lock Controls") } },
-                                state = rememberTooltipState()
-                            ) {
-                                IconButton(
-                                    onClick = onToggleLock
-                                ) {
-                                    Icon(Icons.Filled.LockOpen, contentDescription = "Lock Controls", tint = Color.White)
-                                }
-                            }
-                        }
+                        PlayerTimelineBar(
+                            currentPositionProvider = effectivePositionProvider,
+                            duration = duration,
+                            seekBarStyle = seekBarStyle,
+                            showRemainingTime = showRemainingTime,
+                            onSeekTo = onSeekTo,
+                            onScrubbingModeChange = onScrubbingModeChange,
+                            onShowRemainingTimeChange = onShowRemainingTimeChange
+                        )
 
-                        Row(
-                            modifier = Modifier.weight(0.7f),
-                            horizontalArrangement = Arrangement.SpaceEvenly,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            TooltipBox(
-                                positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
-                                tooltip = { PlainTooltip { Text("Previous") } },
-                                state = rememberTooltipState()
-                            ) {
-                                IconButton(
-                                    onClick = { onPlayPrevious?.invoke() },
-                                    modifier = Modifier.size(activeControlSize.buttonSize),
-                                    enabled = hasPrevious
-                                ) {
-                                    Icon(
-                                        Icons.Filled.SkipPrevious,
-                                        contentDescription = "Previous",
-                                        tint = if (hasPrevious) Color.White else Color.White.copy(alpha = 0.5f),
-                                        modifier = Modifier.size(activeControlSize.iconSize)
-                                    )
-                                }
-                            }
-                            TooltipBox(
-                                positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
-                                tooltip = { PlainTooltip { Text("Rewind ${seekDurationSeconds}s") } },
-                                state = rememberTooltipState()
-                            ) {
-                                if (showSeekButtons) {
-                                    IconButton(
-                                        onClick = { onSeekBackward?.invoke() },
-                                        modifier = Modifier.size(activeControlSize.buttonSize)
-                                    ) {
-                                        Icon(
-                                            Icons.Filled.FastRewind,
-                                            contentDescription = "Rewind ${seekDurationSeconds}s",
-                                            tint = Color.White,
-                                            modifier = Modifier.size(activeControlSize.iconSize)
-                                        )
-                                    }
-                                } else {
-                                    Spacer(Modifier.size(activeControlSize.buttonSize))
-                                }
-                            }
-                            TooltipBox(
-                                positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
-                                tooltip = { PlainTooltip { Text(if (isPlaying) "Pause" else "Play") } },
-                                state = rememberTooltipState()
-                            ) {
-                                IconButton(
-                                    onClick = onPlayPauseToggle,
-                                    modifier = Modifier.size(activeControlSize.playButtonSize)
-                                ) {
-                                    Icon(
-                                        imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                                        contentDescription = if (isPlaying) "Pause" else "Play",
-                                        tint = Color.White,
-                                        modifier = Modifier.size(activeControlSize.playIconSize)
-                                    )
-                                }
-                            }
-                            TooltipBox(
-                                positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
-                                tooltip = { PlainTooltip { Text("Forward ${seekDurationSeconds}s") } },
-                                state = rememberTooltipState()
-                            ) {
-                                if (showSeekButtons) {
-                                    IconButton(
-                                        onClick = { onSeekForward?.invoke() },
-                                        modifier = Modifier.size(activeControlSize.buttonSize)
-                                    ) {
-                                        Icon(
-                                            Icons.Filled.FastForward,
-                                            contentDescription = "Forward ${seekDurationSeconds}s",
-                                            tint = Color.White,
-                                            modifier = Modifier.size(activeControlSize.iconSize)
-                                        )
-                                    }
-                                } else {
-                                    Spacer(Modifier.size(activeControlSize.buttonSize))
-                                }
-                            }
-                            TooltipBox(
-                                positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
-                                tooltip = { PlainTooltip { Text("Next") } },
-                                state = rememberTooltipState()
-                            ) {
-                                IconButton(
-                                    onClick = { onPlayNext?.invoke() },
-                                    modifier = Modifier.size(activeControlSize.buttonSize),
-                                    enabled = hasNext
-                                ) {
-                                    Icon(
-                                        Icons.Filled.SkipNext,
-                                        contentDescription = "Next",
-                                        tint = if (hasNext) Color.White else Color.White.copy(alpha = 0.5f),
-                                        modifier = Modifier.size(activeControlSize.iconSize)
-                                    )
-                                }
-                            }
-                        }
-
-                        Box(modifier = Modifier.weight(0.15f), contentAlignment = Alignment.CenterEnd) {
-                            if (onToggleResizeMode != null) {
-                                TooltipBox(
-                                    positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
-                                    tooltip = { PlainTooltip { Text("Resize Mode") } },
-                                    state = rememberTooltipState()
-                                ) {
-                                    IconButton(
-                                        onClick = onToggleResizeMode
-                                    ) {
-                                        Icon(Icons.Filled.Crop, contentDescription = "Toggle Resize Mode", tint = Color.White)
-                                    }
-                                }
-                            }
-                        }
+                        PlayerActionButtonsRow(
+                            isPlaying = isPlaying,
+                            hasPrevious = hasPrevious,
+                            hasNext = hasNext,
+                            showSeekButtons = showSeekButtons,
+                            seekDurationSeconds = seekDurationSeconds,
+                            activeControlSize = activeControlSize,
+                            onPlayPauseToggle = onPlayPauseToggle,
+                            onPlayPrevious = onPlayPrevious,
+                            onPlayNext = onPlayNext,
+                            onSeekBackward = onSeekBackward,
+                            onSeekForward = onSeekForward,
+                            onToggleLock = onToggleLock,
+                            onToggleResizeMode = onToggleResizeMode
+                        )
                     }
                 }
             }
-        }
         }
     }
 
@@ -647,6 +284,472 @@ fun PlayerControls(
     }
 }
 
+@Composable
+private fun PlayerLockedOverlay(
+    onToggleLock: () -> Unit,
+    showScreenRotationButton: Boolean,
+    onToggleScreenRotation: (() -> Unit)?,
+    modifier: Modifier = Modifier
+) {
+    Box(modifier = modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .padding(start = 32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            IconButton(
+                onClick = onToggleLock,
+                modifier = Modifier
+                    .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+            ) {
+                Icon(Icons.Filled.Lock, contentDescription = "Unlock Controls", tint = Color.White)
+            }
+            if (showScreenRotationButton && onToggleScreenRotation != null) {
+                IconButton(
+                    onClick = onToggleScreenRotation,
+                    modifier = Modifier
+                        .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                ) {
+                    Icon(Icons.Filled.ScreenRotation, contentDescription = "Rotate Screen", tint = Color.White)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PlayerSideControls(
+    showScreenRotationButton: Boolean,
+    onToggleScreenRotation: (() -> Unit)?,
+    onSpeedMenuClick: (() -> Unit)?,
+    modifier: Modifier = Modifier
+) {
+    Box(modifier = modifier.fillMaxSize()) {
+        if (showScreenRotationButton && onToggleScreenRotation != null) {
+            Column(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(start = 12.dp, top = 52.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                IconButton(
+                    onClick = onToggleScreenRotation,
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.ScreenRotation,
+                        contentDescription = "Rotate Screen",
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+        }
+
+        if (onSpeedMenuClick != null) {
+            Column(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(end = 12.dp, top = 52.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                IconButton(
+                    onClick = onSpeedMenuClick,
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Speed,
+                        contentDescription = "Playback Speed",
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PlayerControlsTopBar(
+    title: String,
+    onBack: (() -> Unit)?,
+    onTitleClick: (() -> Unit)?,
+    onInfoClick: (() -> Unit)?,
+    onOpenAudioTracks: (() -> Unit)?,
+    onOpenSubtitles: (() -> Unit)?,
+    onPipToggle: (() -> Unit)?,
+    currentDecoder: DecoderMode,
+    onShowDecoderDialog: () -> Unit,
+    onOpenSettingsSheet: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.75f), Color.Transparent)))
+    ) {
+        Row(
+            modifier = Modifier
+                .windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Vertical))
+                .fillMaxWidth()
+                .padding(horizontal = 4.dp, vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (onBack != null) {
+                TooltipBox(
+                    positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                    tooltip = { PlainTooltip { Text("Back") } },
+                    state = rememberTooltipState()
+                ) {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
+                    }
+                }
+            } else {
+                Spacer(Modifier.width(8.dp))
+            }
+
+            Text(
+                text = title,
+                color = Color.White,
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .weight(1f)
+                    .then(
+                        if (onTitleClick != null) Modifier.clickable { onTitleClick() } else Modifier
+                    )
+            )
+
+            TooltipBox(
+                positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                tooltip = { PlainTooltip { Text("Video Info") } },
+                state = rememberTooltipState()
+            ) {
+                IconButton(onClick = { onInfoClick?.invoke() }) {
+                    Icon(
+                        imageVector = Icons.Filled.Info,
+                        contentDescription = "Video Info",
+                        tint = Color.White
+                    )
+                }
+            }
+
+            if (onOpenAudioTracks != null) {
+                TooltipBox(
+                    positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                    tooltip = { PlainTooltip { Text("Audio Tracks") } },
+                    state = rememberTooltipState()
+                ) {
+                    IconButton(onClick = onOpenAudioTracks) {
+                        Icon(Icons.Filled.Audiotrack, contentDescription = "Audio Tracks", tint = Color.White)
+                    }
+                }
+            }
+
+            if (onOpenSubtitles != null) {
+                TooltipBox(
+                    positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                    tooltip = { PlainTooltip { Text("Subtitles") } },
+                    state = rememberTooltipState()
+                ) {
+                    IconButton(onClick = onOpenSubtitles) {
+                        Icon(Icons.Filled.ClosedCaption, contentDescription = "Subtitles", tint = Color.White)
+                    }
+                }
+            }
+
+            if (onPipToggle != null) {
+                TooltipBox(
+                    positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                    tooltip = { PlainTooltip { Text("Picture in Picture") } },
+                    state = rememberTooltipState()
+                ) {
+                    IconButton(onClick = onPipToggle) {
+                        Icon(Icons.Filled.PictureInPictureAlt, contentDescription = "Picture in Picture", tint = Color.White)
+                    }
+                }
+            }
+
+            TooltipBox(
+                positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                tooltip = { PlainTooltip { Text("Decoder: ${currentDecoder.displayName}") } },
+                state = rememberTooltipState()
+            ) {
+                IconButton(onClick = onShowDecoderDialog) {
+                    Text(
+                        text = currentDecoder.displayName,
+                        color = Color.White,
+                        style = MaterialTheme.typography.labelLarge
+                    )
+                }
+            }
+
+            TooltipBox(
+                positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                tooltip = { PlainTooltip { Text("Playback Settings") } },
+                state = rememberTooltipState()
+            ) {
+                IconButton(onClick = onOpenSettingsSheet) {
+                    Icon(
+                        imageVector = Icons.Filled.Settings,
+                        contentDescription = "Playback Settings",
+                        tint = Color.White
+                    )
+                }
+            }
+            Spacer(Modifier.width(4.dp))
+        }
+    }
+}
+
+@Composable
+private fun PlayerTimelineBar(
+    currentPositionProvider: () -> Long,
+    duration: Long,
+    seekBarStyle: SeekBarStyle,
+    showRemainingTime: Boolean,
+    onSeekTo: (Long) -> Unit,
+    onScrubbingModeChange: (Boolean) -> Unit,
+    onShowRemainingTimeChange: ((Boolean) -> Unit)?,
+    modifier: Modifier = Modifier
+) {
+    var isDragging by remember { mutableStateOf(false) }
+    var dragPosition by remember { mutableFloatStateOf(0f) }
+
+    val effectivePosition = if (isDragging) dragPosition.toLong() else currentPositionProvider()
+    val safeDuration = duration.coerceAtLeast(1L).toFloat()
+    val safeValueRange = 0f..safeDuration
+    val safeSliderPosition = if (isDragging) dragPosition.coerceIn(0f, safeDuration) else effectivePosition.toFloat().coerceIn(0f, safeDuration)
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .offset(y = (-6).dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = formatTime(effectivePosition),
+            color = Color.White,
+            style = MaterialTheme.typography.labelMedium
+        )
+        Spacer(Modifier.width(8.dp))
+
+        if (seekBarStyle == SeekBarStyle.FLAT) {
+            FlatSeekBar(
+                value = safeSliderPosition,
+                valueRange = safeValueRange,
+                onValueChange = {
+                    if (!isDragging) {
+                        isDragging = true
+                        onScrubbingModeChange(true)
+                    }
+                    dragPosition = it
+                },
+                onValueChangeFinished = {
+                    onSeekTo(dragPosition.toLong())
+                    onScrubbingModeChange(false)
+                    isDragging = false
+                },
+                modifier = Modifier.weight(1f)
+            )
+        } else {
+            Slider(
+                value = safeSliderPosition,
+                onValueChange = {
+                    if (!isDragging) {
+                        isDragging = true
+                        onScrubbingModeChange(true)
+                    }
+                    dragPosition = it
+                },
+                onValueChangeFinished = {
+                    onSeekTo(dragPosition.toLong())
+                    onScrubbingModeChange(false)
+                    isDragging = false
+                },
+                valueRange = safeValueRange,
+                modifier = Modifier.weight(1f),
+                colors = SliderDefaults.colors(
+                    thumbColor = Color.White,
+                    activeTrackColor = MaterialTheme.colorScheme.primary,
+                    inactiveTrackColor = Color.White.copy(alpha = 0.4f)
+                )
+            )
+        }
+
+        Spacer(Modifier.width(8.dp))
+        val remaining = if (duration > effectivePosition) duration - effectivePosition else 0L
+        Text(
+            text = if (showRemainingTime) "-" + formatTime(remaining) else formatTime(duration),
+            color = Color.White,
+            style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.clickable { onShowRemainingTimeChange?.invoke(!showRemainingTime) }
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PlayerActionButtonsRow(
+    isPlaying: Boolean,
+    hasPrevious: Boolean,
+    hasNext: Boolean,
+    showSeekButtons: Boolean,
+    seekDurationSeconds: Int,
+    activeControlSize: ControlIconSize,
+    onPlayPauseToggle: () -> Unit,
+    onPlayPrevious: (() -> Unit)?,
+    onPlayNext: (() -> Unit)?,
+    onSeekBackward: (() -> Unit)?,
+    onSeekForward: (() -> Unit)?,
+    onToggleLock: () -> Unit,
+    onToggleResizeMode: (() -> Unit)?,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .offset(y = (-12).dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(modifier = Modifier.weight(0.15f), contentAlignment = Alignment.CenterStart) {
+            TooltipBox(
+                positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                tooltip = { PlainTooltip { Text("Lock Controls") } },
+                state = rememberTooltipState()
+            ) {
+                IconButton(onClick = onToggleLock) {
+                    Icon(Icons.Filled.LockOpen, contentDescription = "Lock Controls", tint = Color.White)
+                }
+            }
+        }
+
+        Row(
+            modifier = Modifier.weight(0.7f),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            TooltipBox(
+                positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                tooltip = { PlainTooltip { Text("Previous") } },
+                state = rememberTooltipState()
+            ) {
+                IconButton(
+                    onClick = { onPlayPrevious?.invoke() },
+                    modifier = Modifier.size(activeControlSize.buttonSize),
+                    enabled = hasPrevious
+                ) {
+                    Icon(
+                        Icons.Filled.SkipPrevious,
+                        contentDescription = "Previous",
+                        tint = if (hasPrevious) Color.White else Color.White.copy(alpha = 0.5f),
+                        modifier = Modifier.size(activeControlSize.iconSize)
+                    )
+                }
+            }
+            TooltipBox(
+                positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                tooltip = { PlainTooltip { Text("Rewind ${seekDurationSeconds}s") } },
+                state = rememberTooltipState()
+            ) {
+                if (showSeekButtons) {
+                    IconButton(
+                        onClick = { onSeekBackward?.invoke() },
+                        modifier = Modifier.size(activeControlSize.buttonSize)
+                    ) {
+                        Icon(
+                            Icons.Filled.FastRewind,
+                            contentDescription = "Rewind ${seekDurationSeconds}s",
+                            tint = Color.White,
+                            modifier = Modifier.size(activeControlSize.iconSize)
+                        )
+                    }
+                } else {
+                    Spacer(Modifier.size(activeControlSize.buttonSize))
+                }
+            }
+            TooltipBox(
+                positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                tooltip = { PlainTooltip { Text(if (isPlaying) "Pause" else "Play") } },
+                state = rememberTooltipState()
+            ) {
+                IconButton(
+                    onClick = onPlayPauseToggle,
+                    modifier = Modifier.size(activeControlSize.playButtonSize)
+                ) {
+                    Icon(
+                        imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                        contentDescription = if (isPlaying) "Pause" else "Play",
+                        tint = Color.White,
+                        modifier = Modifier.size(activeControlSize.playIconSize)
+                    )
+                }
+            }
+            TooltipBox(
+                positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                tooltip = { PlainTooltip { Text("Forward ${seekDurationSeconds}s") } },
+                state = rememberTooltipState()
+            ) {
+                if (showSeekButtons) {
+                    IconButton(
+                        onClick = { onSeekForward?.invoke() },
+                        modifier = Modifier.size(activeControlSize.buttonSize)
+                    ) {
+                        Icon(
+                            Icons.Filled.FastForward,
+                            contentDescription = "Forward ${seekDurationSeconds}s",
+                            tint = Color.White,
+                            modifier = Modifier.size(activeControlSize.iconSize)
+                        )
+                    }
+                } else {
+                    Spacer(Modifier.size(activeControlSize.buttonSize))
+                }
+            }
+            TooltipBox(
+                positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                tooltip = { PlainTooltip { Text("Next") } },
+                state = rememberTooltipState()
+            ) {
+                IconButton(
+                    onClick = { onPlayNext?.invoke() },
+                    modifier = Modifier.size(activeControlSize.buttonSize),
+                    enabled = hasNext
+                ) {
+                    Icon(
+                        Icons.Filled.SkipNext,
+                        contentDescription = "Next",
+                        tint = if (hasNext) Color.White else Color.White.copy(alpha = 0.5f),
+                        modifier = Modifier.size(activeControlSize.iconSize)
+                    )
+                }
+            }
+        }
+
+        Box(modifier = Modifier.weight(0.15f), contentAlignment = Alignment.CenterEnd) {
+            if (onToggleResizeMode != null) {
+                TooltipBox(
+                    positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                    tooltip = { PlainTooltip { Text("Resize Mode") } },
+                    state = rememberTooltipState()
+                ) {
+                    IconButton(onClick = onToggleResizeMode) {
+                        Icon(Icons.Filled.Crop, contentDescription = "Toggle Resize Mode", tint = Color.White)
+                    }
+                }
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun FlatSeekBar(
@@ -666,7 +769,6 @@ private fun FlatSeekBar(
         track = { sliderState ->
             val rawFraction = (sliderState.value - valueRange.start) /
                     (valueRange.endInclusive - valueRange.start).coerceAtLeast(0.001f)
-            // Prevent NaN from freezing composition tree
             val safeFraction = if (rawFraction.isNaN()) 0f else rawFraction.coerceIn(0f, 1f)
             Box(
                 modifier = Modifier

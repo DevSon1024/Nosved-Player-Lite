@@ -818,6 +818,7 @@ fun VideoScreen(
                 isPlaying = playingIntent,
                 title = currentVideo?.title ?: "",
                 currentPosition = displayedPosition,
+                currentPositionProvider = { displayedPosition },
                 duration = duration,
                 videoUri = videoUri,
                 showStats = showStats,

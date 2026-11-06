@@ -60,8 +60,8 @@ private val decoderOptions = listOf(
 @Composable
 fun DecoderSideSheet(
     visible: Boolean,
-    currentMode: DecoderMode = DecoderMode.HW_PLUS,
-    onSelectMode: (DecoderMode) -> Unit = {},
+    currentMode: DecoderMode,
+    onSelectMode: (DecoderMode) -> Unit,
     onDismiss: () -> Unit
 ) {
     val configuration = LocalConfiguration.current
