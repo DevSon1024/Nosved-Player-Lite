@@ -20,6 +20,16 @@ import androidx.media3.common.util.UnstableApi
 import androidx.annotation.OptIn
 import com.nosved.nosvedmedia.NosvedMedia
 import com.nosved.nosvedmedia.media3.FFmpegRenderersFactory
+import com.nosved.nosvedmedia.media3.DecoderPreferences
+import com.nosved.nosvedmedia.media3.DecoderPreference
+import com.nosved.nosvedmedia.media3.DecoderSelectionListener
+import com.nosved.nosvedmedia.media3.PlaybackDiagnosticsListener
+import com.nosved.nosvedmedia.media3.DecoderState
+import com.nosved.nosvedmedia.media3.TrackType
+import com.nosved.nosvedmedia.media3.DecodingCategory
+import com.nosved.nosvedmedia.media3.StructuredPlaybackError
+import com.nosved.nosvedmedia.media3.TrackDecoderStatus
+import com.nosved.nosvedmedia.media3.DecodingPerformanceMetrics
 import androidx.media3.exoplayer.upstream.Loader
 import android.media.audiofx.LoudnessEnhancer
 import com.devson.nvplayerlite.util.AppLogger
@@ -37,7 +47,10 @@ import android.os.Handler
 import androidx.media3.common.MimeTypes
 
 @OptIn(UnstableApi::class)
-class HDRFallbackRenderersFactory(context: Context) : FFmpegRenderersFactory(context) {
+class HDRFallbackRenderersFactory(
+    context: Context,
+    preferences: DecoderPreferences = DecoderPreferences.DEFAULT
+) : FFmpegRenderersFactory(context, preferences) {
     override fun buildVideoRenderers(
         context: Context,
         extensionRendererMode: Int,
@@ -102,6 +115,9 @@ class PlayerManager(private val context: Context) {
     var currentDecoderMode: DecoderMode = DecoderMode.HW_PLUS
         private set
 
+    var currentDecoderPreferences: DecoderPreferences = DecoderPreferences.DEFAULT
+        private set
+
     private val _isPlaying = MutableStateFlow(false)
     val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
 
@@ -127,6 +143,16 @@ class PlayerManager(private val context: Context) {
 
     private val _audioDecoderName = MutableStateFlow<String?>(null)
     val audioDecoderName: StateFlow<String?> = _audioDecoderName.asStateFlow()
+
+    private val _videoDecoderState = MutableStateFlow(DecoderState.IDLE)
+    val videoDecoderState: StateFlow<DecoderState> = _videoDecoderState.asStateFlow()
+
+    private val _audioDecoderState = MutableStateFlow(DecoderState.IDLE)
+    val audioDecoderState: StateFlow<DecoderState> = _audioDecoderState.asStateFlow()
+
+    @Volatile private var pendingHwVideoDecoderName: String? = null
+    @Volatile private var pendingHwAudioDecoderName: String? = null
+    @Volatile private var lastStructuredError: StructuredPlaybackError? = null
 
     private val _playerError = MutableStateFlow<String?>(null)
     val playerError: StateFlow<String?> = _playerError.asStateFlow()
@@ -164,25 +190,114 @@ class PlayerManager(private val context: Context) {
     fun initializePlayer(
         decoderMode: DecoderMode = DecoderMode.HW_PLUS,
         defaultAudioLang: String = "",
-        defaultSubtitleLang: String = ""
+        defaultSubtitleLang: String = "",
+        customPreferences: DecoderPreferences? = null
     ) {
         currentDecoderMode = decoderMode
         preferredAudioLang = defaultAudioLang
         preferredSubtitleLang = defaultSubtitleLang
+
+        val preferences = customPreferences ?: when (decoderMode) {
+            DecoderMode.HW -> DecoderPreferences(
+                video = DecoderPreference.PLATFORM_ONLY,
+                audio = DecoderPreference.PLATFORM_ONLY,
+                allowFallback = false
+            )
+            DecoderMode.HW_PLUS -> DecoderPreferences(
+                video = DecoderPreference.PLATFORM_PREFERRED,
+                audio = DecoderPreference.PLATFORM_PREFERRED,
+                allowFallback = true
+            )
+            DecoderMode.SW -> DecoderPreferences(
+                video = DecoderPreference.SOFTWARE_ONLY,
+                audio = DecoderPreference.SOFTWARE_ONLY,
+                allowFallback = false
+            )
+        }
+        currentDecoderPreferences = preferences
+
         if (exoPlayer == null) {
             NosvedMedia.initialize(context)
-            val extensionMode = when (decoderMode) {
-                DecoderMode.HW      -> androidx.media3.exoplayer.DefaultRenderersFactory.EXTENSION_RENDERER_MODE_OFF
-                DecoderMode.HW_PLUS -> androidx.media3.exoplayer.DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON
-                DecoderMode.SW      -> androidx.media3.exoplayer.DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER
+            val extensionMode = when (preferences.video) {
+                DecoderPreference.PLATFORM_ONLY -> androidx.media3.exoplayer.DefaultRenderersFactory.EXTENSION_RENDERER_MODE_OFF
+                DecoderPreference.PLATFORM_PREFERRED -> androidx.media3.exoplayer.DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON
+                DecoderPreference.SOFTWARE_PREFERRED, DecoderPreference.SOFTWARE_ONLY -> androidx.media3.exoplayer.DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER
+                DecoderPreference.AUTO -> androidx.media3.exoplayer.DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON
             }
-            val renderersFactory = HDRFallbackRenderersFactory(context).apply {
+            val renderersFactory = HDRFallbackRenderersFactory(context, preferences).apply {
                 setExtensionRendererMode(extensionMode)
-                setEnableDecoderFallback(true)
+                setEnableDecoderFallback(preferences.allowFallback)
                 forceDisableMediaCodecAsynchronousQueueing()
-                if (decoderMode == DecoderMode.SW) {
-                    setSoftwareDecoderPriority(com.nosved.nosvedmedia.media3.SoftwareDecoderPriority.PREFER)
-                }
+                setDecoderPreferences(preferences)
+                setSelectionListener(object : DecoderSelectionListener {
+                    override fun onDecoderSelected(rendererName: String, isSoftware: Boolean, format: androidx.media3.common.Format) {
+                        AppLogger.log("DecoderSelection: Candidate selected renderer=$rendererName isSoftware=$isSoftware")
+                        val isVideo = format.sampleMimeType?.startsWith("video/") == true
+                        if (isVideo) {
+                            _videoDecoderState.value = DecoderState.CANDIDATE_SELECTED
+                        } else {
+                            _audioDecoderState.value = DecoderState.CANDIDATE_SELECTED
+                        }
+                    }
+
+                    override fun onDecoderActivated(trackType: TrackType, rendererName: String, decoderEngine: String, format: androidx.media3.common.Format) {
+                        AppLogger.log("DecoderSelection: Decoder activated track=$trackType -> $decoderEngine via $rendererName")
+                        if (trackType == TrackType.VIDEO) {
+                            _videoDecoderName.value = decoderEngine
+                            _videoDecoderState.value = DecoderState.PLAYING
+                        } else if (trackType == TrackType.AUDIO) {
+                            _audioDecoderName.value = decoderEngine
+                            _audioDecoderState.value = DecoderState.PLAYING
+                        }
+                    }
+
+                    override fun onDecoderReleased(trackType: TrackType, rendererName: String) {
+                        AppLogger.log("DecoderSelection: Decoder released track=$trackType -> $rendererName")
+                        if (trackType == TrackType.VIDEO) {
+                            _videoDecoderState.value = DecoderState.RELEASED
+                        } else if (trackType == TrackType.AUDIO) {
+                            _audioDecoderState.value = DecoderState.RELEASED
+                        }
+                    }
+                })
+                setDiagnosticsListener(object : PlaybackDiagnosticsListener {
+                    override fun onDecoderStateChanged(status: TrackDecoderStatus) {
+                        AppLogger.log("DiagnosticsListener: track=${status.trackType} state=${status.state} engine=${status.actualDecoderEngine}")
+                        if (status.trackType == TrackType.VIDEO) {
+                            _videoDecoderState.value = status.state
+                            if (status.isActivelyDecoding && status.actualDecoderEngine != null) {
+                                _videoDecoderName.value = status.actualDecoderEngine
+                            }
+                        } else if (status.trackType == TrackType.AUDIO) {
+                            _audioDecoderState.value = status.state
+                            if (status.isActivelyDecoding && status.actualDecoderEngine != null) {
+                                _audioDecoderName.value = status.actualDecoderEngine
+                            }
+                        }
+                    }
+
+                    override fun onFirstFrameRendered(trackType: TrackType, decoderEngine: String, ptsUs: Long) {
+                        AppLogger.log("DiagnosticsListener: First frame rendered track=$trackType engine=$decoderEngine at $ptsUs us")
+                        if (trackType == TrackType.VIDEO) {
+                            _videoDecoderName.value = decoderEngine
+                            _videoDecoderState.value = DecoderState.PLAYING
+                        } else if (trackType == TrackType.AUDIO) {
+                            _audioDecoderName.value = decoderEngine
+                            _audioDecoderState.value = DecoderState.PLAYING
+                        }
+                    }
+
+                    override fun onPerformanceMetricsUpdated(metrics: DecodingPerformanceMetrics) {
+                        if (metrics.currentFps > 0.0) {
+                            _videoFps.value = metrics.currentFps.toFloat()
+                        }
+                    }
+
+                    override fun onStructuredError(error: StructuredPlaybackError) {
+                        AppLogger.log("DiagnosticsListener: Structured error: ${error.category} on ${error.trackType}: ${error.errorMessage}")
+                        lastStructuredError = error
+                    }
+                })
             }
 
             val loadControl = DefaultLoadControl.Builder()
@@ -242,6 +357,14 @@ class PlayerManager(private val context: Context) {
                             super.onMediaItemTransition(mediaItem, reason)
                             hasAutoSelectedTracksForCurrentMedia = false
                             currentExternalSubtitleUri = null
+                            pendingHwVideoDecoderName = null
+                            pendingHwAudioDecoderName = null
+                            lastStructuredError = null
+                            _videoDecoderName.value = null
+                            _audioDecoderName.value = null
+                            _videoDecoderState.value = DecoderState.IDLE
+                            _audioDecoderState.value = DecoderState.IDLE
+                            _videoFps.value = 0f
                         }
 
                         override fun onTracksChanged(tracks: androidx.media3.common.Tracks) {
@@ -453,46 +576,72 @@ class PlayerManager(private val context: Context) {
 
                             AppLogger.log("ExoPlayer error: ${error.message} - $error")
 
-                            val isFormatUnsupported = error.errorCode == PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED
-                            val isDecoderFailed    = error.errorCode == PlaybackException.ERROR_CODE_DECODER_INIT_FAILED
+                            val structured = lastStructuredError
+                            val category = structured?.category ?: when (error.errorCode) {
+                                PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED -> DecodingCategory.UNSUPPORTED_FORMAT
+                                PlaybackException.ERROR_CODE_DECODER_INIT_FAILED -> DecodingCategory.DECODER_INITIALIZATION_FAILED
+                                PlaybackException.ERROR_CODE_DECODING_FAILED -> DecodingCategory.DECODING_FAILED
+                                PlaybackException.ERROR_CODE_AUDIO_TRACK_INIT_FAILED,
+                                PlaybackException.ERROR_CODE_AUDIO_TRACK_WRITE_FAILED -> DecodingCategory.AUDIO_OUTPUT_FAILED
+                                PlaybackException.ERROR_CODE_IO_UNSPECIFIED,
+                                PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
+                                PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT,
+                                PlaybackException.ERROR_CODE_IO_INVALID_HTTP_CONTENT_TYPE,
+                                PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS,
+                                PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND,
+                                PlaybackException.ERROR_CODE_IO_NO_PERMISSION,
+                                PlaybackException.ERROR_CODE_IO_CLEARTEXT_NOT_PERMITTED,
+                                PlaybackException.ERROR_CODE_IO_READ_POSITION_OUT_OF_RANGE -> DecodingCategory.SOURCE_ERROR
+                                else -> if (error.message?.contains("MediaCodecVideoRenderer") == true) DecodingCategory.DECODING_FAILED else null
+                            }
 
-                            val isSourceError = error.errorCode == PlaybackException.ERROR_CODE_IO_UNSPECIFIED ||
+                            val isFormatUnsupported = category == DecodingCategory.UNSUPPORTED_FORMAT || category == DecodingCategory.UNSUPPORTED_PROFILE
+                            val isDecoderFailed = category == DecodingCategory.DECODER_INITIALIZATION_FAILED
+                            val isDecodingFailed = category == DecodingCategory.DECODING_FAILED
+                            val isSourceError = category == DecodingCategory.SOURCE_ERROR ||
                                     error.cause?.cause is IllegalStateException ||
                                     error.cause is Loader.UnexpectedLoaderException
 
-                            val isMediaCodecRendererError = error.message?.contains("MediaCodecVideoRenderer") == true ||
-                                    error.errorCode == PlaybackException.ERROR_CODE_DECODING_FAILED
-
-                            val isAudioError = error.message?.contains("Audio", ignoreCase = true) == true ||
+                            val isAudioError = structured?.trackType == TrackType.AUDIO ||
+                                    error.message?.contains("Audio", ignoreCase = true) == true ||
                                     error.cause?.message?.contains("Audio", ignoreCase = true) == true ||
                                     error.errorCodeName.contains("AUDIO", ignoreCase = true)
 
                             when {
-                                isMediaCodecRendererError -> {
-                                    AppLogger.log("Recovering from MediaCodecVideoRenderer crash...")
+                                isDecodingFailed && !isAudioError && currentDecoderMode == DecoderMode.HW -> {
+                                    AppLogger.log("Recovering from hardware decoding failure...")
                                     val lastPos = exoPlayer?.currentPosition ?: _currentPosition.value
-                                    if (currentDecoderMode == DecoderMode.HW && onDecoderFallback != null) {
+                                    if (onDecoderFallback != null) {
                                         onDecoderFallback?.invoke(DecoderMode.HW_PLUS)
                                     } else {
                                         exoPlayer?.prepare()
                                         exoPlayer?.seekTo(lastPos)
                                     }
                                 }
-                                isFormatUnsupported || isDecoderFailed -> {
+                                isFormatUnsupported || isDecoderFailed || isDecodingFailed -> {
                                     val fallbackMode = when (currentDecoderMode) {
                                         DecoderMode.HW -> DecoderMode.HW_PLUS
-                                        DecoderMode.SW -> DecoderMode.HW_PLUS
+                                        DecoderMode.SW -> if (currentDecoderPreferences.allowFallback) DecoderMode.HW_PLUS else null
                                         DecoderMode.HW_PLUS -> if (isAudioError) null else DecoderMode.SW
                                     }
                                     if (fallbackMode != null && fallbackMode != currentDecoderMode && onDecoderFallback != null) {
-                                        AppLogger.log("Decoder fallback: Switching from $currentDecoderMode to $fallbackMode due to ${error.errorCodeName}")
+                                        AppLogger.log("Decoder fallback: Switching from $currentDecoderMode to $fallbackMode due to ${category.name}")
                                         onDecoderFallback?.invoke(fallbackMode)
                                     } else {
-                                        val errorMsg = if (isAudioError) {
-                                            "Audio format not supported by selected decoder."
-                                        } else {
-                                            "Playback error: Unsupported video format (${error.localizedMessage ?: error.errorCodeName})"
+                                        val prefix = when (category) {
+                                            DecodingCategory.UNSUPPORTED_FORMAT -> "Unsupported format"
+                                            DecodingCategory.UNSUPPORTED_PROFILE -> "Unsupported profile"
+                                            DecodingCategory.DECODER_INITIALIZATION_FAILED -> "Decoder initialization failed"
+                                            DecodingCategory.DECODING_FAILED -> "Decoding failed"
+                                            DecodingCategory.INVALID_CODEC_CONFIGURATION -> "Invalid codec configuration"
+                                            DecodingCategory.SURFACE_RENDERING_FAILED -> "Surface rendering failed"
+                                            DecodingCategory.AUDIO_OUTPUT_FAILED -> "Audio output failed"
+                                            DecodingCategory.MEMORY_ALLOCATION_FAILED -> "Memory allocation failed"
+                                            DecodingCategory.SOURCE_ERROR -> "Source error"
                                         }
+                                        val trackMsg = if (isAudioError) "Audio" else "Video"
+                                        val engineInfo = structured?.decoderEngine?.let { " [$it]" } ?: ""
+                                        val errorMsg = "$prefix: $trackMsg$engineInfo (${error.localizedMessage ?: error.errorCodeName})"
                                         _playerError.value = errorMsg
                                     }
                                 }
@@ -524,7 +673,22 @@ class PlayerManager(private val context: Context) {
                             initializedTimestampMs: Long,
                             initializationDurationMs: Long
                         ) {
-                            _videoDecoderName.value = decoderName
+                            pendingHwVideoDecoderName = decoderName
+                            if (_videoDecoderState.value != DecoderState.PLAYING) {
+                                _videoDecoderState.value = DecoderState.INITIALIZED
+                            }
+                        }
+
+                        override fun onRenderedFirstFrame(
+                            eventTime: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime,
+                            output: Any,
+                            renderTimeMs: Long
+                        ) {
+                            val name = pendingHwVideoDecoderName
+                            if (name != null) {
+                                _videoDecoderName.value = name
+                                _videoDecoderState.value = DecoderState.PLAYING
+                            }
                         }
 
                         override fun onAudioDecoderInitialized(
@@ -533,11 +697,33 @@ class PlayerManager(private val context: Context) {
                             initializedTimestampMs: Long,
                             initializationDurationMs: Long
                         ) {
-                            _audioDecoderName.value = decoderName
+                            pendingHwAudioDecoderName = decoderName
+                            if (_audioDecoderState.value != DecoderState.PLAYING) {
+                                _audioDecoderState.value = DecoderState.INITIALIZED
+                            }
+                        }
+
+                        override fun onAudioTrackInitialized(
+                            eventTime: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime,
+                            audioTrackConfig: androidx.media3.exoplayer.audio.AudioSink.AudioTrackConfig
+                        ) {
+                            val name = pendingHwAudioDecoderName ?: "System AudioTrack"
+                            _audioDecoderName.value = name
+                            _audioDecoderState.value = DecoderState.PLAYING
+                        }
+
+                        override fun onAudioPositionAdvancing(
+                            eventTime: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime,
+                            playoutStartSystemTimeMs: Long
+                        ) {
+                            if (_audioDecoderName.value == null && pendingHwAudioDecoderName != null) {
+                                _audioDecoderName.value = pendingHwAudioDecoderName
+                                _audioDecoderState.value = DecoderState.PLAYING
+                            }
                         }
                     })
 
-                    // Dynamically calculate FPS for SW decoders which often lack format fps
+                    // Dynamically calculate FPS for decoders rendering frames
                     setVideoFrameMetadataListener(object : androidx.media3.exoplayer.video.VideoFrameMetadataListener {
                         private var frameCount = 0
                         private var lastTimeMs = System.currentTimeMillis()
@@ -561,7 +747,7 @@ class PlayerManager(private val context: Context) {
                     })
                 }
 
-            val player = exoPlayer!!
+            val player = exoPlayer ?: return
             val forwardingPlayer = object : ForwardingPlayer(player) {
                 override fun seekToNext() {
                     onPlayNext?.invoke()
@@ -589,7 +775,7 @@ class PlayerManager(private val context: Context) {
 
             val audioEquivs = LanguageList.getEquivalents(defaultAudioLang)
             val textEquivs = LanguageList.getEquivalents(defaultSubtitleLang)
-            val paramBuilder = exoPlayer!!.trackSelectionParameters.buildUpon()
+            val paramBuilder = player.trackSelectionParameters.buildUpon()
             if (audioEquivs.isNotEmpty()) {
                 paramBuilder.setPreferredAudioLanguages(*audioEquivs.toTypedArray())
             } else {
@@ -686,7 +872,15 @@ class PlayerManager(private val context: Context) {
         val player = exoPlayer ?: return
         hasAutoSelectedTracksForCurrentMedia = false
         currentExternalSubtitleUri = null
+        pendingHwVideoDecoderName = null
+        pendingHwAudioDecoderName = null
+        lastStructuredError = null
         _playerError.value = null
+        _videoDecoderName.value = null
+        _audioDecoderName.value = null
+        _videoDecoderState.value = DecoderState.IDLE
+        _audioDecoderState.value = DecoderState.IDLE
+        _videoFps.value = 0f
         _chapters.value = emptyList()
         val mediaItem = MediaItem.fromUri(video.uri)
         if (startPositionMs > 0L) {
@@ -735,6 +929,7 @@ class PlayerManager(private val context: Context) {
         val duration = player.duration.coerceAtLeast(0L)
         val target = positionMs.coerceIn(0L, duration)
         isSeekingExoPlayer = true
+        _videoFps.value = 0f
         player.seekTo(target)
         _currentPosition.value = target
     }
@@ -744,6 +939,7 @@ class PlayerManager(private val context: Context) {
         val duration = player.duration.coerceAtLeast(0L)
         val target = positionMs.coerceIn(0L, duration)
         isSeekingExoPlayer = true
+        _videoFps.value = 0f
         player.seekTo(target)
         _currentPosition.value = target
     }
@@ -785,8 +981,14 @@ class PlayerManager(private val context: Context) {
     }
 
     fun releasePlayer() {
+        pendingHwVideoDecoderName = null
+        pendingHwAudioDecoderName = null
+        lastStructuredError = null
         _videoDecoderName.value = null
         _audioDecoderName.value = null
+        _videoDecoderState.value = DecoderState.RELEASED
+        _audioDecoderState.value = DecoderState.RELEASED
+        _videoFps.value = 0f
         mediaSession?.release()
         mediaSession = null
         exoPlayer?.release()
