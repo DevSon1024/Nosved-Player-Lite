@@ -150,6 +150,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch { viewSettingsRepo.updateDefaultScreen(screen) }
     }
 
+    fun updateAutoScrollToLastPlayed(autoScroll: Boolean) {
+        viewModelScope.launch { viewSettingsRepo.updateAutoScrollToLastPlayed(autoScroll) }
+    }
+
     val playbackSettings = settingsRepo.playbackSettingsFlow
         .stateIn(
             viewModelScope,

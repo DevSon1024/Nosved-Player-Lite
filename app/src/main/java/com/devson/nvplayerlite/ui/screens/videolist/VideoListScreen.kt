@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.devson.nvplayerlite.model.DefaultScreen
+import com.devson.nvplayerlite.model.LayoutMode
 import com.devson.nvplayerlite.model.Video
 import com.devson.nvplayerlite.model.VideoFolder
 import com.devson.nvplayerlite.model.ViewMode
@@ -131,19 +132,126 @@ fun VideoListScreen(
     val videoListState = rememberLazyListState()
     val videoGridState = rememberLazyGridState()
 
-    // Reset video scroll position when entering a different folder
+    // Reset video scroll position when entering a different folder if auto-scroll is disabled
     LaunchedEffect(selectedFolder) {
         if (selectedFolder?.name != currentFolderId) {
-            videoListState.scrollToItem(0)
-            videoGridState.scrollToItem(0)
             currentFolderId = selectedFolder?.name
+            if (!viewSettings.autoScrollToLastPlayed) {
+                videoListState.scrollToItem(0)
+                videoGridState.scrollToItem(0)
+            }
         }
     }
 
-    //  Watch History 
+    // Watch History
     val homeViewModel: HomeViewModel = viewModel()
     val history by homeViewModel.history.collectAsState()
     val historyMap = remember(history) { history.associateBy { it.uri } }
+
+    // Unique navigation context key for auto-scrolling
+    val latestHistoryUri = history.firstOrNull()?.uri
+    val scrollTargetContextKey = remember(
+        selectedFolder?.name,
+        viewSettings.viewMode,
+        viewSettings.layoutMode,
+        currentExplorerPath,
+        latestHistoryUri
+    ) {
+        "${selectedFolder?.name ?: "root"}::${viewSettings.viewMode.name}::${viewSettings.layoutMode.name}::${currentExplorerPath ?: ""}::${latestHistoryUri ?: ""}"
+    }
+    var lastScrolledContextKey by rememberSaveable { mutableStateOf<String?>(null) }
+
+    // Auto-scroll to last played video
+    LaunchedEffect(
+        scrollTargetContextKey,
+        videosByFolder,
+        explorerNodes,
+        viewSettings.autoScrollToLastPlayed,
+        history
+    ) {
+        if (!viewSettings.autoScrollToLastPlayed) return@LaunchedEffect
+        if (scrollTargetContextKey == lastScrolledContextKey) return@LaunchedEffect
+
+        when (viewSettings.viewMode) {
+            ViewMode.ALL_FOLDERS -> {
+                val currentFolder = selectedFolder
+                if (currentFolder != null) {
+                    val folderVideos = videosByFolder[currentFolder] ?: emptyList()
+                    if (folderVideos.isNotEmpty()) {
+                        val sorted = folderVideos.applySort(viewSettings.sortField, viewSettings.sortDirection)
+                        val lastHistory = history.firstOrNull { h -> sorted.any { it.uri == h.uri } }
+                        val targetIndex = if (lastHistory != null) sorted.indexOfFirst { it.uri == lastHistory.uri } else -1
+                        lastScrolledContextKey = scrollTargetContextKey
+                        if (targetIndex > 0) {
+                            kotlinx.coroutines.delay(120)
+                            if (videoListState.isScrollInProgress || videoGridState.isScrollInProgress) return@LaunchedEffect
+                            if (viewSettings.layoutMode == LayoutMode.LIST) {
+                                videoListState.smoothScrollToTarget(targetIndex)
+                            } else {
+                                videoGridState.smoothScrollToTarget(targetIndex)
+                            }
+                        }
+                    }
+                } else {
+                    if (sortedFolderKeys.isNotEmpty()) {
+                        val lastHistory = history.firstOrNull()
+                        val targetIndex = if (lastHistory != null) {
+                            sortedFolderKeys.indexOfFirst { folder ->
+                                (videosByFolder[folder] ?: emptyList()).any { it.uri == lastHistory.uri }
+                            }
+                        } else -1
+                        lastScrolledContextKey = scrollTargetContextKey
+                        if (targetIndex > 0) {
+                            kotlinx.coroutines.delay(120)
+                            if (folderListState.isScrollInProgress || folderGridState.isScrollInProgress) return@LaunchedEffect
+                            if (viewSettings.layoutMode == LayoutMode.LIST) {
+                                folderListState.smoothScrollToTarget(targetIndex)
+                            } else {
+                                folderGridState.smoothScrollToTarget(targetIndex)
+                            }
+                        }
+                    }
+                }
+            }
+            ViewMode.FILES -> {
+                val allVideos = videosByFolder.values.flatten()
+                if (allVideos.isNotEmpty()) {
+                    val sorted = allVideos.applySort(viewSettings.sortField, viewSettings.sortDirection)
+                    val lastHistory = history.firstOrNull { h -> sorted.any { it.uri == h.uri } }
+                    val targetIndex = if (lastHistory != null) sorted.indexOfFirst { it.uri == lastHistory.uri } else -1
+                    lastScrolledContextKey = scrollTargetContextKey
+                    if (targetIndex > 0) {
+                        kotlinx.coroutines.delay(120)
+                        if (videoListState.isScrollInProgress || videoGridState.isScrollInProgress) return@LaunchedEffect
+                        if (viewSettings.layoutMode == LayoutMode.LIST) {
+                            videoListState.smoothScrollToTarget(targetIndex)
+                        } else {
+                            videoGridState.smoothScrollToTarget(targetIndex)
+                        }
+                    }
+                }
+            }
+            ViewMode.FOLDERS -> {
+                val (expFolders, expVideos) = explorerNodes
+                if (expVideos.isNotEmpty() || expFolders.isNotEmpty()) {
+                    val sortedExpVideos = expVideos.applySort(viewSettings.sortField, viewSettings.sortDirection)
+                    val lastHistory = history.firstOrNull { h -> sortedExpVideos.any { it.uri == h.uri } }
+                    val videoIdx = if (lastHistory != null) sortedExpVideos.indexOfFirst { it.uri == lastHistory.uri } else -1
+                    val targetIndex = if (videoIdx >= 0) expFolders.size + videoIdx else -1
+                    lastScrolledContextKey = scrollTargetContextKey
+                    if (targetIndex > 0) {
+                        kotlinx.coroutines.delay(120)
+                        if (folderListState.isScrollInProgress || folderGridState.isScrollInProgress) return@LaunchedEffect
+                        if (viewSettings.layoutMode == LayoutMode.LIST) {
+                            folderListState.smoothScrollToTarget(targetIndex)
+                        } else {
+                            folderGridState.smoothScrollToTarget(targetIndex)
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     //  File Operations 
     val fileOpsViewModel: FileOperationsViewModel = viewModel()
@@ -162,10 +270,11 @@ fun VideoListScreen(
     var storageExplorerOp by remember { mutableStateOf<String?>(null) }
     var storageExplorerUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
 
-    if (storageExplorerOp != null) {
+    val activeStorageOp = storageExplorerOp
+    if (activeStorageOp != null) {
         BackHandler { storageExplorerOp = null }
         StorageExplorerScreen(
-            operationType = storageExplorerOp!!,
+            operationType = activeStorageOp,
             sourceUris = storageExplorerUris,
             onComplete = {
                 storageExplorerOp = null
@@ -466,7 +575,8 @@ fun VideoListScreen(
                         val lastHistory = history.firstOrNull { it.uri in folderUris }
                         if (lastHistory != null) folderVideos.find { it.uri == lastHistory.uri } else null
                     } else if (viewSettings.viewMode == ViewMode.FOLDERS && currentExplorerPath != null) {
-                        val pathVideos = allVideosFlat.filter { it.path.startsWith(currentExplorerPath!!) }
+                        val expPath = currentExplorerPath ?: ""
+                        val pathVideos = allVideosFlat.filter { it.path.startsWith(expPath) }
                         val pathUris = pathVideos.map { it.uri }.toSet()
                         val lastHistory = history.firstOrNull { it.uri in pathUris }
                         if (lastHistory != null) pathVideos.find { it.uri == lastHistory.uri } else null
@@ -493,7 +603,8 @@ fun VideoListScreen(
                                     allVideosFlat.applySort(viewSettings.sortField, viewSettings.sortDirection)
                                 }
                                 ViewMode.FOLDERS -> if (currentExplorerPath != null) {
-                                    allVideosFlat.filter { it.path.startsWith(currentExplorerPath!!) }.applySort(viewSettings.sortField, viewSettings.sortDirection)
+                                    val expPath = currentExplorerPath ?: ""
+                                    allVideosFlat.filter { it.path.startsWith(expPath) }.applySort(viewSettings.sortField, viewSettings.sortDirection)
                                 } else {
                                     allVideosFlat.applySort(viewSettings.sortField, viewSettings.sortDirection)
                                 }
@@ -796,4 +907,36 @@ fun VideoListScreen(
             }
         )
     }
+}
+
+private suspend fun androidx.compose.foundation.lazy.LazyListState.smoothScrollToTarget(targetIndex: Int) {
+    if (targetIndex < 0) return
+    val totalCount = layoutInfo.totalItemsCount
+    if (totalCount > 0 && targetIndex >= totalCount) return
+    val currentIndex = firstVisibleItemIndex
+    if (kotlin.math.abs(targetIndex - currentIndex) > 12) {
+        val intermediateIndex = if (targetIndex > currentIndex) {
+            (targetIndex - 8).coerceAtLeast(0)
+        } else {
+            (targetIndex + 8).coerceAtMost(if (totalCount > 0) totalCount - 1 else targetIndex)
+        }
+        scrollToItem(intermediateIndex)
+    }
+    animateScrollToItem(targetIndex)
+}
+
+private suspend fun androidx.compose.foundation.lazy.grid.LazyGridState.smoothScrollToTarget(targetIndex: Int) {
+    if (targetIndex < 0) return
+    val totalCount = layoutInfo.totalItemsCount
+    if (totalCount > 0 && targetIndex >= totalCount) return
+    val currentIndex = firstVisibleItemIndex
+    if (kotlin.math.abs(targetIndex - currentIndex) > 12) {
+        val intermediateIndex = if (targetIndex > currentIndex) {
+            (targetIndex - 8).coerceAtLeast(0)
+        } else {
+            (targetIndex + 8).coerceAtMost(if (totalCount > 0) totalCount - 1 else targetIndex)
+        }
+        scrollToItem(intermediateIndex)
+    }
+    animateScrollToItem(targetIndex)
 }

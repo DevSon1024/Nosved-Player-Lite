@@ -46,6 +46,7 @@ class ViewSettingsRepository(private val context: Context) {
         val SHOW_VIDEO_CARD = booleanPreferencesKey("show_video_card")
         val SHOW_STORAGE_TRACKER = booleanPreferencesKey("show_storage_tracker")
         val DEFAULT_SCREEN = stringPreferencesKey("default_screen")
+        val AUTO_SCROLL_TO_LAST_PLAYED = booleanPreferencesKey("auto_scroll_to_last_played")
     }
 
     val viewSettingsFlow: Flow<ViewSettings> = context.viewSettingsDataStore.data.map { preferences ->
@@ -74,7 +75,8 @@ class ViewSettingsRepository(private val context: Context) {
             showHistoryCard = preferences[SHOW_HISTORY_CARD] ?: true,
             showVideoCard = preferences[SHOW_VIDEO_CARD] ?: true,
             showStorageTracker = preferences[SHOW_STORAGE_TRACKER] ?: true,
-            defaultScreen = try { DefaultScreen.valueOf(preferences[DEFAULT_SCREEN] ?: DefaultScreen.HOME.name) } catch (e: Exception) { DefaultScreen.HOME }
+            defaultScreen = try { DefaultScreen.valueOf(preferences[DEFAULT_SCREEN] ?: DefaultScreen.HOME.name) } catch (e: Exception) { DefaultScreen.HOME },
+            autoScrollToLastPlayed = preferences[AUTO_SCROLL_TO_LAST_PLAYED] ?: true
         )
     }
 
@@ -176,5 +178,9 @@ class ViewSettingsRepository(private val context: Context) {
 
     suspend fun updateDefaultScreen(screen: DefaultScreen) {
         context.viewSettingsDataStore.edit { it[DEFAULT_SCREEN] = screen.name }
+    }
+
+    suspend fun updateAutoScrollToLastPlayed(autoScroll: Boolean) {
+        context.viewSettingsDataStore.edit { it[AUTO_SCROLL_TO_LAST_PLAYED] = autoScroll }
     }
 }

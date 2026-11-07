@@ -46,5 +46,6 @@ data class ViewSettings(
     val showHistoryCard: Boolean = true,
     val showVideoCard: Boolean = true,
     val showStorageTracker: Boolean = true,
-    val defaultScreen: DefaultScreen = DefaultScreen.HOME
+    val defaultScreen: DefaultScreen = DefaultScreen.HOME,
+    val autoScrollToLastPlayed: Boolean = true
 )

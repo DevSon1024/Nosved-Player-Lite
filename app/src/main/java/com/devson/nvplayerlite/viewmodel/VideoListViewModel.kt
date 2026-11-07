@@ -323,6 +323,7 @@ class VideoListViewModel(application: Application) : AndroidViewModel(applicatio
     fun updateDisplayLengthOverThumbnail(display: Boolean) = viewModelScope.launch { settingsRepository.updateDisplayLengthOverThumbnail(display) }
     fun updateShowHiddenFiles(show: Boolean) = viewModelScope.launch { settingsRepository.updateShowHiddenFiles(show) }
     fun updateRecognizeNoMedia(recognize: Boolean) = viewModelScope.launch { settingsRepository.updateRecognizeNoMedia(recognize) }
+    fun updateAutoScrollToLastPlayed(autoScroll: Boolean) = viewModelScope.launch { settingsRepository.updateAutoScrollToLastPlayed(autoScroll) }
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()

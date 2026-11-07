@@ -10,6 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.TouchApp
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.*
@@ -94,6 +95,14 @@ fun ListOptionScreen(
                         subtitle = "Switch to selection mode by touching the thumbnail or icon",
                         checked = viewSettings.selectByThumbnail,
                         onCheckedChange = { settingsViewModel.updateSelectByThumbnail(it) }
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(start = 56.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                    SettingsToggleRow(
+                        icon = Icons.Default.PlayCircle,
+                        title = "Auto scroll to last played video",
+                        subtitle = "Automatically scroll to the last watched video when opening a list or folder",
+                        checked = viewSettings.autoScrollToLastPlayed,
+                        onCheckedChange = { settingsViewModel.updateAutoScrollToLastPlayed(it) }
                     )
                 }
             }

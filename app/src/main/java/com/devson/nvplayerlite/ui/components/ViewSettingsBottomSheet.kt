@@ -235,6 +235,7 @@ fun ViewSettingsBottomSheet(
             AdvancedToggleRow("Length over Thumbnail", settings.displayLengthOverThumbnail) { viewModel.updateDisplayLengthOverThumbnail(it) }
             AdvancedToggleRow("Show Hidden Files", settings.showHiddenFiles) { viewModel.updateShowHiddenFiles(it) }
             AdvancedToggleRow("Recognize .nomedia", settings.recognizeNoMedia) { viewModel.updateRecognizeNoMedia(it) }
+            AdvancedToggleRow("Auto scroll to last played", settings.autoScrollToLastPlayed) { viewModel.updateAutoScrollToLastPlayed(it) }
 
             Spacer(modifier = Modifier.height(24.dp))
         }
