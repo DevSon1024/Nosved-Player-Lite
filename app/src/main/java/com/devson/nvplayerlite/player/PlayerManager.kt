@@ -70,16 +70,37 @@ class HDRFallbackRenderersFactory(
                 requiresSecureDecoder: Boolean,
                 requiresTunnelingDecoder: Boolean
             ): MutableList<MediaCodecInfo> {
-                val targetMimeType = if (mimeType == MimeTypes.VIDEO_DOLBY_VISION) {
-                    MimeTypes.VIDEO_H265
-                } else {
-                    mimeType
-                }
-                return MediaCodecSelector.DEFAULT.getDecoderInfos(
-                    targetMimeType,
+                val primaryInfos = MediaCodecSelector.DEFAULT.getDecoderInfos(
+                    mimeType,
                     requiresSecureDecoder,
                     requiresTunnelingDecoder
                 )
+                if (mimeType == MimeTypes.VIDEO_DOLBY_VISION) {
+                    val combined = ArrayList(primaryInfos)
+                    combined.addAll(
+                        MediaCodecSelector.DEFAULT.getDecoderInfos(
+                            MimeTypes.VIDEO_H265,
+                            requiresSecureDecoder,
+                            requiresTunnelingDecoder
+                        )
+                    )
+                    combined.addAll(
+                        MediaCodecSelector.DEFAULT.getDecoderInfos(
+                            MimeTypes.VIDEO_H264,
+                            requiresSecureDecoder,
+                            requiresTunnelingDecoder
+                        )
+                    )
+                    combined.addAll(
+                        MediaCodecSelector.DEFAULT.getDecoderInfos(
+                            MimeTypes.VIDEO_AV1,
+                            requiresSecureDecoder,
+                            requiresTunnelingDecoder
+                        )
+                    )
+                    return combined
+                }
+                return primaryInfos
             }
         }
 
