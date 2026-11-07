@@ -47,6 +47,12 @@ import androidx.media3.exoplayer.mediacodec.MediaCodecInfo
 import androidx.media3.exoplayer.video.VideoRendererEventListener
 import androidx.media3.exoplayer.Renderer
 import android.os.Handler
+import android.os.Looper
+import java.util.concurrent.atomic.AtomicLong
+import androidx.media3.exoplayer.hls.HlsMediaSource
+import androidx.media3.exoplayer.hls.DefaultHlsExtractorFactory
+import androidx.media3.extractor.ts.DefaultTsPayloadReaderFactory
+import androidx.media3.exoplayer.dash.DashMediaSource
 import androidx.media3.common.MimeTypes
 
 @OptIn(UnstableApi::class)
@@ -162,6 +168,20 @@ class PlayerManager(private val context: Context) {
 
     private val _bufferedPosition = MutableStateFlow(0L)
     val bufferedPosition: StateFlow<Long> = _bufferedPosition.asStateFlow()
+
+    private var bandwidthMeter: androidx.media3.exoplayer.upstream.DefaultBandwidthMeter? = null
+    private var dataSourceFactory: androidx.media3.datasource.DefaultDataSource.Factory? = null
+    private val bytesTransferredWindow = AtomicLong(0L)
+    @Volatile private var lastSpeedCalcTimeMs = System.currentTimeMillis()
+
+    private val _isNetworkStream = MutableStateFlow(false)
+    val isNetworkStream: StateFlow<Boolean> = _isNetworkStream.asStateFlow()
+
+    private val _networkSpeedBytesPerSec = MutableStateFlow(0L)
+    val networkSpeedBytesPerSec: StateFlow<Long> = _networkSpeedBytesPerSec.asStateFlow()
+
+    private val _bufferDurationSeconds = MutableStateFlow(0.0)
+    val bufferDurationSeconds: StateFlow<Double> = _bufferDurationSeconds.asStateFlow()
 
     private val _isPortraitVideo = MutableStateFlow<Boolean?>(null)
     val isPortraitVideo: StateFlow<Boolean?> = _isPortraitVideo.asStateFlow()
@@ -347,15 +367,40 @@ class PlayerManager(private val context: Context) {
                 })
             }
 
+            val meter = androidx.media3.exoplayer.upstream.DefaultBandwidthMeter.Builder(context)
+                .setResetOnNetworkTypeChange(true)
+                .build()
+            meter.addEventListener(
+                Handler(Looper.getMainLooper())
+            ) { _, bytesTransferred, _ ->
+                bytesTransferredWindow.addAndGet(bytesTransferred)
+            }
+            bandwidthMeter = meter
+
             val loadControl = DefaultLoadControl.Builder()
                 .setBufferDurationsMs(
-                    DefaultLoadControl.DEFAULT_MIN_BUFFER_MS,
-                    DefaultLoadControl.DEFAULT_MAX_BUFFER_MS,
+                    15000,
+                    50000,
                     1500,
                     2500
                 )
-                .setPrioritizeTimeOverSizeThresholds(true)
+                .setTargetBufferBytes(32 * 1024 * 1024)
+                .setPrioritizeTimeOverSizeThresholds(false)
+                .setBackBuffer(10000, true)
                 .build()
+
+            val httpDataSourceFactory = androidx.media3.datasource.DefaultHttpDataSource.Factory()
+                .setUserAgent("Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36 NosvedPlayerLite/1.4.0")
+                .setConnectTimeoutMs(20000)
+                .setReadTimeoutMs(25000)
+                .setAllowCrossProtocolRedirects(true)
+                .setKeepPostFor302Redirects(true)
+                .setTransferListener(meter)
+
+            val dsFactory = androidx.media3.datasource.DefaultDataSource.Factory(context, httpDataSourceFactory)
+                .setTransferListener(meter)
+            dataSourceFactory = dsFactory
+            val mediaSourceFactory = androidx.media3.exoplayer.source.DefaultMediaSourceFactory(dsFactory)
 
             val audioAttributes = AudioAttributes.Builder()
                 .setUsage(C.USAGE_MEDIA)
@@ -364,6 +409,8 @@ class PlayerManager(private val context: Context) {
 
             exoPlayer = ExoPlayer.Builder(context)
                 .setRenderersFactory(renderersFactory)
+                .setMediaSourceFactory(mediaSourceFactory)
+                .setBandwidthMeter(meter)
                 .setLoadControl(loadControl)
                 .setAudioAttributes(audioAttributes, true)
                 .setHandleAudioBecomingNoisy(true)
@@ -684,7 +731,8 @@ class PlayerManager(private val context: Context) {
 
                             when {
                                 isSourceError -> {
-                                    val msg = error.message ?: "Source error"
+                                    val msg = error.message ?: "Network stream or source error"
+                                    _playerError.value = msg
                                     onPlaybackError?.invoke(msg)
                                 }
                                 isFormatUnsupported || isDecoderFailed || isDecodingFailed -> {
@@ -1035,12 +1083,92 @@ class PlayerManager(private val context: Context) {
         _framesDropped.value = 0L
         _videoFps.value = 0f
         _chapters.value = emptyList()
-        val mediaItem = MediaItem.fromUri(video.uri)
-        if (startPositionMs > 0L) {
-            player.setMediaItem(mediaItem, startPositionMs)
-            _currentPosition.value = startPositionMs
+
+        val uriString = video.uri
+        val isStream = uriString.startsWith("http://", ignoreCase = true) ||
+                uriString.startsWith("https://", ignoreCase = true) ||
+                uriString.startsWith("rtsp://", ignoreCase = true) ||
+                uriString.startsWith("rtmp://", ignoreCase = true)
+        _isNetworkStream.value = isStream
+        _networkSpeedBytesPerSec.value = 0L
+        _bufferDurationSeconds.value = 0.0
+        bytesTransferredWindow.set(0L)
+        lastSpeedCalcTimeMs = System.currentTimeMillis()
+
+        val cleanPath = runCatching { Uri.parse(uriString).path?.lowercase() }.getOrNull() ?: uriString.lowercase()
+        val isHls = cleanPath.endsWith(".m3u8") || cleanPath.endsWith(".m3u") ||
+                uriString.contains(".m3u8", ignoreCase = true) ||
+                uriString.contains(".m3u", ignoreCase = true) ||
+                uriString.contains("/hls", ignoreCase = true) ||
+                video.mimeType.equals(MimeTypes.APPLICATION_M3U8, ignoreCase = true) ||
+                video.mimeType.equals("application/vnd.apple.mpegurl", ignoreCase = true)
+
+        val isDash = cleanPath.endsWith(".mpd") ||
+                uriString.contains(".mpd", ignoreCase = true) ||
+                uriString.contains("/dash", ignoreCase = true) ||
+                video.mimeType.equals(MimeTypes.APPLICATION_MPD, ignoreCase = true)
+
+        val mimeType = when {
+            isHls -> MimeTypes.APPLICATION_M3U8
+            isDash -> MimeTypes.APPLICATION_MPD
+            cleanPath.endsWith(".mp4") -> MimeTypes.VIDEO_MP4
+            cleanPath.endsWith(".mkv") -> MimeTypes.VIDEO_MATROSKA
+            cleanPath.endsWith(".webm") -> MimeTypes.VIDEO_WEBM
+            cleanPath.endsWith(".ts") -> MimeTypes.VIDEO_MP2T
+            else -> video.mimeType
+        }
+
+        val mediaItem = MediaItem.Builder()
+            .setUri(uriString)
+            .apply {
+                if (mimeType != null) setMimeType(mimeType)
+                if (video.title.isNotBlank()) {
+                    setMediaMetadata(
+                        androidx.media3.common.MediaMetadata.Builder()
+                            .setTitle(video.title)
+                            .build()
+                    )
+                }
+            }
+            .build()
+
+        val dsFactory = dataSourceFactory ?: androidx.media3.datasource.DefaultDataSource.Factory(context)
+
+        if (isHls) {
+            val hlsSource = androidx.media3.exoplayer.hls.HlsMediaSource.Factory(dsFactory)
+                .setAllowChunklessPreparation(false)
+                .setExtractorFactory(
+                    androidx.media3.exoplayer.hls.DefaultHlsExtractorFactory(
+                        androidx.media3.extractor.ts.DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES,
+                        true
+                    )
+                )
+                .createMediaSource(mediaItem)
+
+            if (startPositionMs > 0L) {
+                player.setMediaSource(hlsSource, startPositionMs)
+            } else {
+                player.setMediaSource(hlsSource)
+            }
+        } else if (isDash) {
+            val dashSource = androidx.media3.exoplayer.dash.DashMediaSource.Factory(dsFactory)
+                .createMediaSource(mediaItem)
+
+            if (startPositionMs > 0L) {
+                player.setMediaSource(dashSource, startPositionMs)
+            } else {
+                player.setMediaSource(dashSource)
+            }
         } else {
-            player.setMediaItem(mediaItem)
+            if (startPositionMs > 0L) {
+                player.setMediaItem(mediaItem, startPositionMs)
+            } else {
+                player.setMediaItem(mediaItem)
+            }
+        }
+
+        if (startPositionMs > 0L) {
+            _currentPosition.value = startPositionMs
         }
         player.prepare()
         player.playWhenReady = true
@@ -1118,6 +1246,27 @@ class PlayerManager(private val context: Context) {
         }
         _bufferedPosition.value = player.bufferedPosition.coerceAtLeast(0L)
         _duration.value = player.duration.coerceAtLeast(0L)
+
+        if (_isNetworkStream.value) {
+            val bufferedMs = player.totalBufferedDuration.coerceAtLeast(0L)
+            _bufferDurationSeconds.value = bufferedMs / 1000.0
+
+            val now = System.currentTimeMillis()
+            val deltaMs = now - lastSpeedCalcTimeMs
+            if (deltaMs >= 1000L) {
+                val bytes = bytesTransferredWindow.getAndSet(0L)
+                val calculatedSpeed = (bytes * 1000L) / deltaMs
+                val meterEstimate = bandwidthMeter?.bitrateEstimate ?: 0L
+                if (calculatedSpeed > 0L) {
+                    _networkSpeedBytesPerSec.value = calculatedSpeed
+                } else if (player.isLoading && meterEstimate > 0L) {
+                    _networkSpeedBytesPerSec.value = meterEstimate / 8L
+                } else {
+                    _networkSpeedBytesPerSec.value = 0L
+                }
+                lastSpeedCalcTimeMs = now
+            }
+        }
         
         player.videoFormat?.frameRate?.let { fps ->
             if (fps > 0f) {
@@ -1145,6 +1294,12 @@ class PlayerManager(private val context: Context) {
         _averageDecodeLatencyMs.value = 0.0
         _framesDropped.value = 0L
         _videoFps.value = 0f
+        _isNetworkStream.value = false
+        _networkSpeedBytesPerSec.value = 0L
+        _bufferDurationSeconds.value = 0.0
+        bandwidthMeter = null
+        dataSourceFactory = null
+        bytesTransferredWindow.set(0L)
         mediaSession?.release()
         mediaSession = null
         exoPlayer?.release()

@@ -124,9 +124,13 @@ class MainActivity : AppCompatActivity() {
     private fun handleIntent(intent: Intent?) {
         if (intent?.action == Intent.ACTION_VIEW) {
             intent.data?.let { uri ->
+                val isStream = uri.scheme == "http" || uri.scheme == "https"
+                val title = uri.lastPathSegment?.takeIf { it.isNotBlank() } ?: if (isStream) "Network Stream" else "External Video"
                 val video = Video(
                     uri = uri.toString(),
-                    title = uri.lastPathSegment ?: "External Video"
+                    title = title,
+                    folderName = if (isStream) "Network Stream" else "External",
+                    path = uri.toString()
                 )
                 videoViewModelRef?.playVideo(video)
             }

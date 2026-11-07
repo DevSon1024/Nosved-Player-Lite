@@ -69,6 +69,9 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     val fallbackReason get() = playerManager?.fallbackReason
     val averageDecodeLatencyMs get() = playerManager?.averageDecodeLatencyMs
     val framesDropped get() = playerManager?.framesDropped
+    val isNetworkStream get() = playerManager?.isNetworkStream
+    val networkSpeedBytesPerSec get() = playerManager?.networkSpeedBytesPerSec
+    val bufferDurationSeconds get() = playerManager?.bufferDurationSeconds
 
     // --- Audio & Subtitle Tracks from Manager ---
     val audioTracks get() = playerManager?.audioTracks
@@ -260,7 +263,9 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
             }
 
             playerManager?.onPlaybackError = {
-                playNextVideo()
+                if (_currentPlaylist.value.size > 1) {
+                    playNextVideo()
+                }
             }
             playerManager?.onDecoderFallback = { fallbackMode ->
                 setDecoderMode(fallbackMode)

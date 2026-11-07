@@ -6,6 +6,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.Settings
@@ -48,6 +49,7 @@ fun VideoListTopAppBar(
     onShowSettings: () -> Unit,
     onBackToFolders: () -> Unit,
     onSearch: (String) -> Unit = {},
+    onPlayStream: (() -> Unit)? = null,
     searchActive: Boolean = false,
     searchText: String = "",
     onSearchActiveChange: (Boolean) -> Unit = {},
@@ -142,6 +144,15 @@ fun VideoListTopAppBar(
                         Icon(Icons.Filled.Close, contentDescription = "Close Search")
                     }
                 } else {
+                    if (onPlayStream != null) {
+                        IconButton(onClick = onPlayStream) {
+                            Icon(
+                                imageVector = Icons.Filled.Language,
+                                contentDescription = "Play Network Stream",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
                     IconButton(onClick = { onSearchActiveChange(true) }) {
                         Icon(Icons.Filled.Search, contentDescription = "Search")
                     }

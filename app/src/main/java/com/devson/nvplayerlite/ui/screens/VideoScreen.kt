@@ -66,8 +66,24 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.HourglassBottom
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
+import java.util.Locale
 import androidx.activity.compose.BackHandler
 import androidx.media3.ui.AspectRatioFrameLayout
 import com.devson.nvplayerlite.ui.components.InformationBottomSheet
@@ -112,6 +128,9 @@ fun VideoScreen(
     val videoDecoderPreference by viewModel.videoDecoderPreference.collectAsState()
     val audioDecoderPreference by viewModel.audioDecoderPreference.collectAsState()
     val fallbackHistory by viewModel.fallbackHistory.collectAsState()
+    val isNetworkStream by (viewModel.isNetworkStream ?: kotlinx.coroutines.flow.flowOf(false)).collectAsState(initial = false)
+    val networkSpeedBytesPerSec by (viewModel.networkSpeedBytesPerSec ?: kotlinx.coroutines.flow.flowOf(0L)).collectAsState(initial = 0L)
+    val bufferDurationSeconds by (viewModel.bufferDurationSeconds ?: kotlinx.coroutines.flow.flowOf(0.0)).collectAsState(initial = 0.0)
 
     val controlsVisible by viewModel.controlsVisible.collectAsState()
     val currentVideo by viewModel.currentVideo.collectAsState()
@@ -939,6 +958,23 @@ fun VideoScreen(
                 onSpeedMenuClick = { showPlayerSettingsSideSheet = true }
             )
         }
+
+        if (!isActivityInPip && isNetworkStream) {
+            AnimatedVisibility(
+                visible = controlsVisible && !isLocked && !isAnySideSheetVisible,
+                enter = fadeIn() + slideInVertically(initialOffsetY = { -it }),
+                exit = fadeOut() + slideOutVertically(targetOffsetY = { -it }),
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .statusBarsPadding()
+                    .padding(top = 70.dp, end = 16.dp)
+            ) {
+                StreamingDataPanel(
+                    speedBps = networkSpeedBytesPerSec,
+                    bufferSec = bufferDurationSeconds
+                )
+            }
+        }
     }
 }
 
@@ -1068,4 +1104,70 @@ private fun showSystemUI(activity: Activity) {
     androidx.core.view.WindowCompat.getInsetsController(window, window.decorView).show(
         androidx.core.view.WindowInsetsCompat.Type.systemBars()
     )
+}
+
+@Composable
+fun StreamingDataPanel(
+    speedBps: Long,
+    bufferSec: Double,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = Color.Black.copy(alpha = 0.6f)
+        ),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)),
+        shape = RoundedCornerShape(12.dp),
+        modifier = modifier
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Download,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(16.dp)
+                )
+                Text(
+                    text = "Speed: ${formatSpeed(speedBps)}",
+                    color = Color.White,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.HourglassBottom,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier.size(16.dp)
+                )
+                Text(
+                    text = "Buffer: ${String.format(Locale.US, "%.1fs", bufferSec)}",
+                    color = Color.White,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    }
+}
+
+private fun formatSpeed(bytesPerSec: Long): String {
+    val kb = bytesPerSec / 1024.0
+    val mb = kb / 1024.0
+    return when {
+        mb >= 1.0 -> String.format(Locale.US, "%.2f MB/s", mb)
+        kb >= 1.0 -> String.format(Locale.US, "%.1f KB/s", kb)
+        else -> "$bytesPerSec B/s"
+    }
 }

@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FiberNew
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
@@ -95,6 +96,23 @@ fun HomeScreen(
     val uiState by homeViewModel.uiState.collectAsState()
     val viewSettings by videoListViewModel.viewSettings.collectAsState()
     val historyMap = remember(history) { history.associateBy { it.uri } }
+    var showNetworkDialog by remember { mutableStateOf(false) }
+
+    if (showNetworkDialog) {
+        com.devson.nvplayerlite.ui.components.NetworkStreamDialog(
+            onDismiss = { showNetworkDialog = false },
+            onPlay = { uri ->
+                showNetworkDialog = false
+                val streamVideo = Video(
+                    uri = uri.toString(),
+                    title = uri.lastPathSegment?.takeIf { it.isNotBlank() } ?: "Network Stream",
+                    folderName = "Network Stream",
+                    path = uri.toString()
+                )
+                onVideoSelected(streamVideo, listOf(streamVideo), 0L)
+            }
+        )
+    }
 
     LaunchedEffect(Unit) { videoListViewModel.loadVideos() }
 
@@ -171,6 +189,13 @@ fun HomeScreen(
                             Icon(Icons.Filled.Close, contentDescription = "Close Search")
                         }
                     } else {
+                        IconButton(onClick = { showNetworkDialog = true }) {
+                            Icon(
+                                imageVector = Icons.Filled.Language,
+                                contentDescription = "Play Network Stream",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
                         IconButton(onClick = { searchActive = true }) {
                             Icon(Icons.Filled.Search, contentDescription = "Search")
                         }
