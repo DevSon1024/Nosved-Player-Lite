@@ -46,6 +46,13 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     private val _playingIntent = MutableStateFlow(true)
     val playingIntent: StateFlow<Boolean> = _playingIntent.asStateFlow()
 
+    private val _isInPipMode = MutableStateFlow(false)
+    val isInPipMode: StateFlow<Boolean> = _isInPipMode.asStateFlow()
+
+    fun setInPipMode(inPip: Boolean) {
+        _isInPipMode.value = inPip
+    }
+
     val isPlaying get() = playerManager?.isPlaying
     val currentPosition get() = playerManager?.currentPosition
     val duration get() = playerManager?.duration

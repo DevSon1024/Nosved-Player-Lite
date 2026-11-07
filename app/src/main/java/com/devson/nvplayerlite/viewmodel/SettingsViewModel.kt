@@ -434,6 +434,18 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch { settingsRepo.updateSubtitleGesturesEnabled(enabled) }
     }
 
+    fun updateSubtitleBorderWidth(width: Float) {
+        viewModelScope.launch { settingsRepo.updateSubtitleBorderWidth(width) }
+    }
+
+    fun updateSubtitleBorderColor(color: Long) {
+        viewModelScope.launch { settingsRepo.updateSubtitleBorderColor(color) }
+    }
+
+    fun updateSubtitleTextColor(color: Long) {
+        viewModelScope.launch { settingsRepo.updateSubtitleTextColor(color) }
+    }
+
     fun updateDoubleTapAction(action: com.devson.nvplayerlite.repository.DoubleTapAction) {
         viewModelScope.launch { settingsRepo.updateDoubleTapAction(action) }
     }

@@ -177,6 +177,8 @@ fun VideoScreen(
     val subtitleBgStyle by viewModel.subtitleBgStyle.collectAsState()
     val subtitleDelayMs by viewModel.subtitleDelayMs.collectAsState()
     val subtitleVerticalOffset by viewModel.subtitleVerticalOffset.collectAsState()
+    val isInPipMode by viewModel.isInPipMode.collectAsState()
+    val isActivityInPip = Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && (activity?.isInPictureInPictureMode == true || isInPipMode)
     val currentDecoder by viewModel.currentDecoderMode.collectAsState()
     val currentPlaybackSpeed by viewModel.currentPlaybackSpeed.collectAsState()
     val updatedCurrentPlaybackSpeed by rememberUpdatedState(currentPlaybackSpeed)
@@ -342,8 +344,28 @@ fun VideoScreen(
         }
     }
 
-    LaunchedEffect(orientationMode, isPortrait) {
-        activity ?: return@LaunchedEffect
+    LaunchedEffect(playbackSettings.subtitleTextSizeScale) {
+        viewModel.updateSubtitleTextSizeScale(playbackSettings.subtitleTextSizeScale)
+    }
+
+    LaunchedEffect(playbackSettings.subtitleVerticalOffset) {
+        viewModel.setSubtitleVerticalOffset(playbackSettings.subtitleVerticalOffset)
+    }
+
+    LaunchedEffect(isActivityInPip) {
+        if (isActivityInPip) {
+            showPlayerSettingsSideSheet = false
+            showAudioSettingsSideSheet = false
+            showSubtitleSettingsSideSheet = false
+            showInfoSheet = false
+            showQueueSheet = false
+            showDecoderSideSheet = false
+            viewModel.setShowStats(false)
+        }
+    }
+
+    LaunchedEffect(orientationMode, isPortrait, isActivityInPip) {
+        if (activity == null || isActivityInPip) return@LaunchedEffect
         when (orientationMode) {
             com.devson.nvplayerlite.repository.OrientationMode.SYSTEM_DEFAULT,
             com.devson.nvplayerlite.repository.OrientationMode.VIDEO_ORIENTATION -> {
@@ -369,12 +391,16 @@ fun VideoScreen(
     DisposableEffect(lifecycleOwner, pauseWhenObstructed) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
             if (event == androidx.lifecycle.Lifecycle.Event.ON_PAUSE) {
-                if (pauseWhenObstructed && player?.isPlaying == true) {
-                    viewModel.pauseVideo()
-                } else {
-                    viewModel.pauseVideo()
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N &&
+                    (activity?.isInPictureInPictureMode == true || viewModel.isInPipMode.value)) {
+                    return@LifecycleEventObserver
                 }
+                viewModel.pauseVideo()
             } else if (event == androidx.lifecycle.Lifecycle.Event.ON_STOP) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N &&
+                    (activity?.isInPictureInPictureMode == true || viewModel.isInPipMode.value)) {
+                    return@LifecycleEventObserver
+                }
                 viewModel.pauseVideo()
             }
         }
@@ -384,7 +410,8 @@ fun VideoScreen(
         }
     }
 
-    LaunchedEffect(fullScreenMode, softButtonMode) {
+    LaunchedEffect(fullScreenMode, softButtonMode, isActivityInPip) {
+        if (isActivityInPip) return@LaunchedEffect
         val window = activity?.window
         if (window != null) {
             androidx.core.view.WindowCompat.getInsetsController(window, window.decorView).apply {
@@ -513,134 +540,141 @@ fun VideoScreen(
             )
         }
 
-        //  Gesture overlay (volume / brightness swipe - always active) 
-        GestureOverlay(
-            modifier = Modifier.fillMaxSize(),
-            seekDurationSeconds = seekDurationSeconds,
-            isPlaying = playingIntent,
-            isLocked = isLocked,
-            fastplaySpeed = fastplaySpeed,
-            currentPosition = currentPosition,
-            duration = duration,
+        // Gesture overlay (volume / brightness swipe - active when not in PiP)
+        if (!isActivityInPip) {
+            GestureOverlay(
+                modifier = Modifier.fillMaxSize(),
+                seekDurationSeconds = seekDurationSeconds,
+                isPlaying = playingIntent,
+                isLocked = isLocked,
+                fastplaySpeed = fastplaySpeed,
+                currentPosition = currentPosition,
+                duration = duration,
 
-            // Pass all custom gesture settings down
-            seekGestureEnabled = playbackSettings.seekGestureEnabled,
-            seekSensitivity = playbackSettings.seekSensitivity,
-            brightnessGestureEnabled = playbackSettings.brightnessGestureEnabled,
-            brightnessSensitivity = playbackSettings.brightnessSensitivity,
-            volumeGestureEnabled = playbackSettings.volumeGestureEnabled,
-            volumeSensitivity = playbackSettings.volumeSensitivity,
-            twoFingerAction = playbackSettings.twoFingerAction,
-            threeFingerAction = playbackSettings.threeFingerAction,
-            longPressEnabled = playbackSettings.longPressEnabled,
-            longPressSpeed = playbackSettings.tapAndHoldSpeed.takeIf { it > 0f } ?: playbackSettings.longPressSpeed,
-            doubleTapAction = playbackSettings.doubleTapAction,
+                // Pass all custom gesture settings down
+                seekGestureEnabled = playbackSettings.seekGestureEnabled,
+                seekSensitivity = playbackSettings.seekSensitivity,
+                brightnessGestureEnabled = playbackSettings.brightnessGestureEnabled,
+                brightnessSensitivity = playbackSettings.brightnessSensitivity,
+                volumeGestureEnabled = playbackSettings.volumeGestureEnabled,
+                volumeSensitivity = playbackSettings.volumeSensitivity,
+                twoFingerAction = playbackSettings.twoFingerAction,
+                threeFingerAction = playbackSettings.threeFingerAction,
+                longPressEnabled = playbackSettings.longPressEnabled,
+                longPressSpeed = playbackSettings.tapAndHoldSpeed.takeIf { it > 0f } ?: playbackSettings.longPressSpeed,
+                doubleTapAction = playbackSettings.doubleTapAction,
 
-            onSingleTap = { viewModel.toggleControlsVisibility() },
-            onDoubleTapLeft = {
-                viewModel.seekBackward()
-            },
-            onDoubleTapCenter = { viewModel.togglePlayPause() },
-            onDoubleTapRight = {
-                viewModel.seekForward()
-            },
-            onSeekStart = { viewModel.beginSeek() },
-            onSeekPreview = { pos -> viewModel.updateSeekPreview(pos) },
-            onSeekCommit = { absPos -> viewModel.updateSeekPreview(absPos); viewModel.commitSeek() },
+                onSingleTap = { viewModel.toggleControlsVisibility() },
+                onDoubleTapLeft = {
+                    viewModel.seekBackward()
+                },
+                onDoubleTapCenter = { viewModel.togglePlayPause() },
+                onDoubleTapRight = {
+                    viewModel.seekForward()
+                },
+                onSeekStart = { viewModel.beginSeek() },
+                onSeekPreview = { pos -> viewModel.updateSeekPreview(pos) },
+                onSeekCommit = { absPos -> viewModel.updateSeekPreview(absPos); viewModel.commitSeek() },
 
-            // Revert back to proper currentPlaybackSpeed instead of hardcoded 1f
-            onFastForwardToggle = { active, activeSpeed ->
-                if (active) {
-                    if (!ytIsFastForwarding) {
-                        preFastForwardSpeed = updatedCurrentPlaybackSpeed  // always fresh
-                        ytIsFastForwarding = true
-                        viewModel.setPlaybackSpeed(activeSpeed)
+                // Revert back to proper currentPlaybackSpeed instead of hardcoded 1f
+                onFastForwardToggle = { active, activeSpeed ->
+                    if (active) {
+                        if (!ytIsFastForwarding) {
+                            preFastForwardSpeed = updatedCurrentPlaybackSpeed  // always fresh
+                            ytIsFastForwarding = true
+                            viewModel.setPlaybackSpeed(activeSpeed)
+                        }
+                    } else {
+                        if (ytIsFastForwarding) {
+                            ytIsFastForwarding = false
+                            viewModel.setPlaybackSpeed(preFastForwardSpeed)
+                        }
                     }
-                } else {
-                    if (ytIsFastForwarding) {
-                        ytIsFastForwarding = false
-                        viewModel.setPlaybackSpeed(preFastForwardSpeed)
-                    }
-                }
-            },
+                },
 
-            onZoom = { factor -> zoomScale = (zoomScale * factor).coerceIn(1f, 4f) },
-            zoomScale = zoomScale,
-            onVolumeSwipe = { delta ->
-                val currentVol = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
-                accumulatedVolume += delta
-                val newVol = (accumulatedVolume * maxVolume).toInt().coerceIn(0, maxVolume)
-                if (newVol != currentVol) {
-                    audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, newVol, 0)
-                    val actualVol = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
-                    if (actualVol < newVol) {
-                        accumulatedVolume = actualVol.toFloat() / maxVolume
+                onZoom = { factor -> zoomScale = (zoomScale * factor).coerceIn(1f, 4f) },
+                zoomScale = zoomScale,
+                onVolumeSwipe = { delta ->
+                    val currentVol = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+                    accumulatedVolume += delta
+                    val newVol = (accumulatedVolume * maxVolume).toInt().coerceIn(0, maxVolume)
+                    if (newVol != currentVol) {
+                        audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, newVol, 0)
+                        val actualVol = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+                        if (actualVol < newVol) {
+                            accumulatedVolume = actualVol.toFloat() / maxVolume
+                        }
+                        volumeLevel = actualVol.toFloat() / maxVolume
                     }
-                    volumeLevel = actualVol.toFloat() / maxVolume
-                }
-                showVolumeFeedback = true
-                volumeFeedbackTrigger++
-            },
-            onBrightnessSwipe = { delta ->
-                val window = activity?.window
-                if (window != null) {
-                    val lp = window.attributes
-                    val currentBrightness = if (lp.screenBrightness >= 0f) lp.screenBrightness else 0.5f
-                    val newBrightness = (currentBrightness + delta).coerceIn(0.01f, 1f)
-                    lp.screenBrightness = newBrightness
-                    window.attributes = lp
-                    brightnessLevel = newBrightness
-                    showBrightnessFeedback = true
-                    brightnessFeedbackTrigger++
-                }
-            },
-            volumeLevel = volumeLevel,
-            brightnessLevel = brightnessLevel,
-            showVolumeFeedback = showVolumeFeedback,
-            showBrightnessFeedback = showBrightnessFeedback,
-            isAudioBoostEnabled = isAudioBoostEnabled
-        )
+                    showVolumeFeedback = true
+                    volumeFeedbackTrigger++
+                },
+                onBrightnessSwipe = { delta ->
+                    val window = activity?.window
+                    if (window != null) {
+                        val lp = window.attributes
+                        val currentBrightness = if (lp.screenBrightness >= 0f) lp.screenBrightness else 0.5f
+                        val newBrightness = (currentBrightness + delta).coerceIn(0.01f, 1f)
+                        lp.screenBrightness = newBrightness
+                        window.attributes = lp
+                        brightnessLevel = newBrightness
+                        showBrightnessFeedback = true
+                        brightnessFeedbackTrigger++
+                    }
+                },
+                volumeLevel = volumeLevel,
+                brightnessLevel = brightnessLevel,
+                showVolumeFeedback = showVolumeFeedback,
+                showBrightnessFeedback = showBrightnessFeedback,
+                isAudioBoostEnabled = isAudioBoostEnabled
+            )
+        }
 
-        ComposeSubtitleOverlay(
-            player = player, 
-            textSizeScale = subtitleTextSizeScale, 
-            bgStyle = subtitleBgStyle,
-            useSystemCaptionStyle = playbackSettings.useSystemCaptionStyle,
-            subtitleFont = playbackSettings.subtitleFont,
-            isSubtitleBold = playbackSettings.isSubtitleBold,
-            forceAssSubtitleOverride = playbackSettings.forceAssSubtitleOverride,
-            isSubtitleGestureEnabled = isSubtitleGestureEnabled,
-            subtitleDelayMs = subtitleDelayMs,
-            verticalOffsetFraction = subtitleVerticalOffset
-        )
+        if (!isActivityInPip) {
+            ComposeSubtitleOverlay(
+                player = player, 
+                textSizeScale = subtitleTextSizeScale, 
+                bgStyle = playbackSettings.subtitleBgStyle,
+                useSystemCaptionStyle = playbackSettings.useSystemCaptionStyle,
+                subtitleFont = playbackSettings.subtitleFont,
+                isSubtitleBold = playbackSettings.isSubtitleBold,
+                forceAssSubtitleOverride = playbackSettings.forceAssSubtitleOverride,
+                isSubtitleGestureEnabled = isSubtitleGestureEnabled,
+                subtitleDelayMs = subtitleDelayMs,
+                verticalOffsetFraction = subtitleVerticalOffset,
+                textColor = Color(playbackSettings.subtitleTextColor)
+            )
+        }
 
         // Device stats overlay
-        DeviceStatsOverlay(
-            visible = showStats || playbackSettings.showStatsOverlay,
-            player = player,
-            videoFpsProvider = { viewModel.videoFps?.value ?: 0f },
-            videoDecoderName = videoDecoderName,
-            audioDecoderName = audioDecoderName,
-            decoderMode = currentDecoder,
-            videoDecoderPreference = videoDecoderPreference,
-            audioDecoderPreference = audioDecoderPreference,
-            videoDecoderState = videoDecoderState,
-            audioDecoderState = audioDecoderState,
-            fallbackReason = fallbackReason,
-            decodeLatencyMsProvider = { viewModel.averageDecodeLatencyMs?.value ?: 0.0 },
-            framesDroppedProvider = { viewModel.framesDropped?.value ?: 0L },
-            fallbackHistory = fallbackHistory,
-            playerError = playerError,
-            onDismiss = {
-                viewModel.setShowStats(false)
-                settingsViewModel.updateShowStatsOverlay(false)
-            },
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(top = 16.dp, start = 16.dp)
-        )
+        if (!isActivityInPip) {
+            DeviceStatsOverlay(
+                visible = showStats || playbackSettings.showStatsOverlay,
+                player = player,
+                videoFpsProvider = { viewModel.videoFps?.value ?: 0f },
+                videoDecoderName = videoDecoderName,
+                audioDecoderName = audioDecoderName,
+                decoderMode = currentDecoder,
+                videoDecoderPreference = videoDecoderPreference,
+                audioDecoderPreference = audioDecoderPreference,
+                videoDecoderState = videoDecoderState,
+                audioDecoderState = audioDecoderState,
+                fallbackReason = fallbackReason,
+                decodeLatencyMsProvider = { viewModel.averageDecodeLatencyMs?.value ?: 0.0 },
+                framesDroppedProvider = { viewModel.framesDropped?.value ?: 0L },
+                fallbackHistory = fallbackHistory,
+                playerError = playerError,
+                onDismiss = {
+                    viewModel.setShowStats(false)
+                    settingsViewModel.updateShowStatsOverlay(false)
+                },
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(top = 16.dp, start = 16.dp)
+            )
+        }
 
-        if (showElapsedTimeOverlay) {
+        if (!isActivityInPip && showElapsedTimeOverlay) {
             Text(
                 text = formatDuration(displayedPosition),
                 color = Color.White,
@@ -651,7 +685,7 @@ fun VideoScreen(
             )
         }
 
-        if (showBatteryClockOverlay) {
+        if (!isActivityInPip && showBatteryClockOverlay) {
             val batteryManager = remember { context.getSystemService(Context.BATTERY_SERVICE) as android.os.BatteryManager }
             val sdf = remember { java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()) }
             var currentTime by remember { mutableStateOf(sdf.format(java.util.Date())) }
@@ -681,11 +715,19 @@ fun VideoScreen(
             )
         }
 
-        //  Player controls - switch between Default and Modern style 
-        val hasPrevious = currentPlaylist.isNotEmpty() && currentPlaylistIndex > 0
-        val hasNext = currentPlaylist.isNotEmpty() && currentPlaylistIndex in 0 until currentPlaylist.lastIndex
+        val onTriggerPip: () -> Unit = {
+            val format = player?.videoFormat
+            val width = format?.width ?: 0
+            val height = format?.height ?: 0
+            (activity as? com.devson.nvplayerlite.MainActivity)?.enterPipMode(width, height)
+        }
 
-        if (useModernStyle) {
+        if (!isActivityInPip) {
+            // Player controls - switch between Default and Modern style 
+            val hasPrevious = currentPlaylist.isNotEmpty() && currentPlaylistIndex > 0
+            val hasNext = currentPlaylist.isNotEmpty() && currentPlaylistIndex in 0 until currentPlaylist.lastIndex
+
+            if (useModernStyle) {
             // Capsule-style player controls from NosvedPlayer with custom control region positioning
             AnimatedVisibility(
                 visible = controlsVisible && !isLocked && !isAnySideSheetVisible,
@@ -753,12 +795,7 @@ fun VideoScreen(
                         viewModel.showControlsAndDelayHide()
                     },
                     currentAspectMode = playbackSettings.aspectMode,
-                    onPipClick = {
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                            val pipParams = android.app.PictureInPictureParams.Builder().build()
-                            activity?.enterPictureInPictureMode(pipParams)
-                        }
-                    },
+                    onPipClick = onTriggerPip,
                     onBackgroundPlayClick = {
                         val next = !playbackSettings.backgroundPlayEnabled
                         settingsViewModel.updateBackgroundPlayEnabled(next)
@@ -883,12 +920,7 @@ fun VideoScreen(
                     isLocked = !isLocked
                     viewModel.showControlsAndDelayHide()
                 },
-                onPipToggle = {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        val pipParams = android.app.PictureInPictureParams.Builder().build()
-                        activity?.enterPictureInPictureMode(pipParams)
-                    }
-                },
+                onPipToggle = onTriggerPip,
                 showScreenRotationButton = showScreenRotationButton,
                 showRemainingTime = showRemainingTime,
                 onShowRemainingTimeChange = { settingsViewModel.updateShowRemainingTime(it) },
@@ -908,6 +940,7 @@ fun VideoScreen(
             )
         }
     }
+}
 
     //  Nosved Player Side Sheets 
 
@@ -946,6 +979,9 @@ fun VideoScreen(
         onUpdateForceAssSubtitleOverride = { settingsViewModel.updateForceAssSubtitleOverride(it) },
         onUpdateSubtitleTextSizeScale = {
             viewModel.updateSubtitleTextSizeScale(it)
+        },
+        onCommitSubtitleTextSizeScale = {
+            viewModel.updateSubtitleTextSizeScale(it)
             settingsViewModel.updateSubtitleTextSizeScale(it)
         },
         onUpdateSubtitleBgStyle = {
@@ -958,12 +994,16 @@ fun VideoScreen(
         },
         onUpdateSubtitleVerticalOffset = {
             viewModel.setSubtitleVerticalOffset(it)
+        },
+        onCommitSubtitleVerticalOffset = {
+            viewModel.setSubtitleVerticalOffset(it)
             settingsViewModel.updateSubtitleVerticalOffset(it)
         },
         onUpdateSubtitleGesturesEnabled = {
             isSubtitleGestureEnabled = it
             settingsViewModel.updateSubtitleGesturesEnabled(it)
         },
+        onUpdateSubtitleTextColor = { settingsViewModel.updateSubtitleTextColor(it) },
         onDismiss = { showSubtitleSettingsSideSheet = false },
         onImportSubtitleClick = { externalSubtitleLauncher.launch("*/*") }
     )

@@ -15,6 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
@@ -50,6 +51,7 @@ fun ComposeSubtitleOverlay(
     isSubtitleGestureEnabled: Boolean = true,
     subtitleDelayMs: Long = 0L,
     verticalOffsetFraction: Float = 0f,
+    textColor: Color = Color.White,
     modifier: Modifier = Modifier
 ) {
     val coroutineScope = rememberCoroutineScope()
@@ -129,7 +131,7 @@ fun ComposeSubtitleOverlay(
     )
 
     BoxWithConstraints(
-        modifier = modifier.fillMaxSize(),
+        modifier = modifier.fillMaxSize().clipToBounds(),
         contentAlignment = Alignment.BottomCenter
     ) {
         val maxHeightPx = constraints.maxHeight.toFloat()
@@ -192,11 +194,11 @@ fun ComposeSubtitleOverlay(
                             return@detectDragGestures
                         }
 
-                        //  2a. Vertical → reposition 
+                        // 2a. Vertical reposition 
                         if (lockedVertical == true) {
                             rawOffsetY = (rawOffsetY + dy).coerceIn(
                                 -maxHeightPx * 0.85f,
-                                maxHeightPx * 0.30f
+                                maxHeightPx * 0.50f
                             )
                             return@detectDragGestures
                         }
@@ -265,9 +267,9 @@ fun ComposeSubtitleOverlay(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         currentCues.forEach { cue ->
-                            if (cue.bitmap != null) {
+                            cue.bitmap?.asImageBitmap()?.let { bmp ->
                                 Image(
-                                    bitmap = cue.bitmap!!.asImageBitmap(),
+                                    bitmap = bmp,
                                     contentDescription = null
                                 )
                             }
@@ -298,10 +300,13 @@ fun ComposeSubtitleOverlay(
                                 } else {
                                     cue.text.toString()
                                 }
+
+                                val effectiveTextColor = if (textColor == Color.Unspecified) Color.White else textColor
+
                                 Text(
                                     text = displayText,
                                     fontSize = (16 * textSizeScale).sp,
-                                    color = Color.White,
+                                    color = effectiveTextColor,
                                     fontFamily = targetFontFamily,
                                     fontWeight = targetFontWeight,
                                     textAlign = TextAlign.Center,

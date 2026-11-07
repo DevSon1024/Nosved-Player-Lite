@@ -17,6 +17,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -59,12 +60,15 @@ fun SubtitleSettingsSideSheet(
     onUpdateIsSubtitleBold: (Boolean) -> Unit,
     onUpdateForceAssSubtitleOverride: (Boolean) -> Unit,
     onUpdateSubtitleTextSizeScale: (Float) -> Unit,
+    onCommitSubtitleTextSizeScale: (Float) -> Unit = onUpdateSubtitleTextSizeScale,
     onUpdateSubtitleBgStyle: (Int) -> Unit,
     onUpdateSubtitleDelay: (Long) -> Unit,
     onUpdateSubtitleVerticalOffset: (Float) -> Unit,
+    onCommitSubtitleVerticalOffset: (Float) -> Unit = onUpdateSubtitleVerticalOffset,
     onUpdateSubtitleGesturesEnabled: (Boolean) -> Unit,
     onDismiss: () -> Unit,
-    onImportSubtitleClick: () -> Unit
+    onImportSubtitleClick: () -> Unit,
+    onUpdateSubtitleTextColor: (Long) -> Unit = {}
 ) {
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -253,7 +257,9 @@ fun SubtitleSettingsSideSheet(
                                     onUpdateIsSubtitleBold = onUpdateIsSubtitleBold,
                                     onUpdateForceAssSubtitleOverride = onUpdateForceAssSubtitleOverride,
                                     onUpdateSubtitleTextSizeScale = onUpdateSubtitleTextSizeScale,
-                                    onUpdateSubtitleBgStyle = onUpdateSubtitleBgStyle
+                                    onCommitSubtitleTextSizeScale = onCommitSubtitleTextSizeScale,
+                                    onUpdateSubtitleBgStyle = onUpdateSubtitleBgStyle,
+                                    onUpdateSubtitleTextColor = onUpdateSubtitleTextColor
                                 )
 
                                 2 -> SyncTab(
@@ -261,6 +267,7 @@ fun SubtitleSettingsSideSheet(
                                     onSetSubtitleDelay = onSetSubtitleDelay,
                                     onUpdateSubtitleDelay = onUpdateSubtitleDelay,
                                     onUpdateSubtitleVerticalOffset = onUpdateSubtitleVerticalOffset,
+                                    onCommitSubtitleVerticalOffset = onCommitSubtitleVerticalOffset,
                                     onUpdateSubtitleGesturesEnabled = onUpdateSubtitleGesturesEnabled
                                 )
                             }
@@ -490,13 +497,27 @@ private fun StyleTab(
     onUpdateIsSubtitleBold: (Boolean) -> Unit,
     onUpdateForceAssSubtitleOverride: (Boolean) -> Unit,
     onUpdateSubtitleTextSizeScale: (Float) -> Unit,
-    onUpdateSubtitleBgStyle: (Int) -> Unit
+    onCommitSubtitleTextSizeScale: (Float) -> Unit,
+    onUpdateSubtitleBgStyle: (Int) -> Unit,
+    onUpdateSubtitleTextColor: (Long) -> Unit
 ) {
-    var localScale by remember(playbackSettings.subtitleTextSizeScale) { mutableFloatStateOf(playbackSettings.subtitleTextSizeScale) }
+    var localScale by remember { mutableFloatStateOf(playbackSettings.subtitleTextSizeScale) }
+    val scaleInteractionSource = remember { MutableInteractionSource() }
+    val isScaleDragging by scaleInteractionSource.collectIsDraggedAsState()
+
+    LaunchedEffect(playbackSettings.subtitleTextSizeScale) {
+        if (!isScaleDragging) {
+            localScale = playbackSettings.subtitleTextSizeScale
+        }
+    }
 
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         // Live Subtitle Preview Box
-        SubtitleLivePreviewCard(playbackSettings = playbackSettings, textScale = localScale)
+        SubtitleLivePreviewCard(
+            playbackSettings = playbackSettings,
+            textScale = localScale,
+            textColor = playbackSettings.subtitleTextColor
+        )
 
         // Text Size Scale Slider Card
         Surface(
@@ -559,6 +580,7 @@ private fun StyleTab(
                                 .roundToTwoDecimals()
                             localScale = newScale
                             onUpdateSubtitleTextSizeScale(newScale)
+                            onCommitSubtitleTextSizeScale(newScale)
                         }
                     )
 
@@ -568,7 +590,11 @@ private fun StyleTab(
                             localScale = it
                             onUpdateSubtitleTextSizeScale(it.roundToTwoDecimals())
                         },
+                        onValueChangeFinished = {
+                            onCommitSubtitleTextSizeScale(localScale.roundToTwoDecimals())
+                        },
                         valueRange = 0.5f..3.0f,
+                        interactionSource = scaleInteractionSource,
                         modifier = Modifier.weight(1f)
                     )
 
@@ -581,8 +607,124 @@ private fun StyleTab(
                                 .roundToTwoDecimals()
                             localScale = newScale
                             onUpdateSubtitleTextSizeScale(newScale)
+                            onCommitSubtitleTextSizeScale(newScale)
                         }
                     )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Size preset chips
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    listOf(
+                        0.8f to "Small",
+                        1.0f to "Normal",
+                        1.2f to "Medium",
+                        1.5f to "Large",
+                        2.0f to "Huge"
+                    ).forEach { (preset, label) ->
+                        val isSelected = kotlin.math.abs(localScale - preset) < 0.05f
+                        Surface(
+                            onClick = {
+                                localScale = preset
+                                onUpdateSubtitleTextSizeScale(preset)
+                                onCommitSubtitleTextSizeScale(preset)
+                            },
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.6f),
+                            contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Box(
+                                modifier = Modifier.padding(vertical = 6.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = label,
+                                    fontSize = 11.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Subtitle Text Color Card
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.6f),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.FormatColorText,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Text(
+                        text = "Subtitle Text Color",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    listOf(
+                        0xFFFFFFFFL to "White",
+                        0xFFFFEB3BL to "Yellow",
+                        0xFFFFF59DL to "Cream",
+                        0xFF80D8FFL to "Cyan",
+                        0xFFA5D6A7L to "Green",
+                        0xFFFFB74DL to "Amber"
+                    ).forEach { (colorValue, name) ->
+                        val isSelected = playbackSettings.subtitleTextColor == colorValue
+                        Surface(
+                            onClick = { onUpdateSubtitleTextColor(colorValue) },
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.6f),
+                            border = BorderStroke(
+                                width = if (isSelected) 1.5.dp else 1.dp,
+                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f)
+                            ),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(vertical = 8.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(16.dp)
+                                        .background(Color(colorValue), CircleShape)
+                                        .border(1.dp, Color.Black.copy(alpha = 0.3f), CircleShape)
+                                )
+                                Text(
+                                    text = name,
+                                    fontSize = 9.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -704,7 +846,8 @@ private fun StyleTab(
 @Composable
 private fun SubtitleLivePreviewCard(
     playbackSettings: PlaybackSettings,
-    textScale: Float = playbackSettings.subtitleTextSizeScale
+    textScale: Float = playbackSettings.subtitleTextSizeScale,
+    textColor: Long = playbackSettings.subtitleTextColor
 ) {
     val fontFamily = when (playbackSettings.subtitleFont) {
         SubtitleFont.DEFAULT -> FontFamily.Default
@@ -713,13 +856,15 @@ private fun SubtitleLivePreviewCard(
         SubtitleFont.SERIF -> FontFamily.Serif
     }
 
+    val previewTextColor = Color(textColor)
+
     Surface(
         shape = RoundedCornerShape(16.dp),
         color = Color.Black.copy(alpha = 0.85f),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
         modifier = Modifier
             .fillMaxWidth()
-            .height(96.dp)
+            .height(100.dp)
     ) {
         Box(
             modifier = Modifier.fillMaxSize(),
@@ -735,13 +880,16 @@ private fun SubtitleLivePreviewCard(
                 else -> Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
             }
 
-            Box(modifier = bgModifier) {
+            Box(modifier = bgModifier, contentAlignment = Alignment.Center) {
+                val previewSize = (14 * textScale.coerceIn(0.7f, 1.8f)).sp
+                val fontWeight = if (playbackSettings.isSubtitleBold) FontWeight.Bold else FontWeight.Normal
+
                 Text(
                     text = "Sample Subtitle Text Preview",
-                    color = Color.White,
+                    color = previewTextColor,
                     fontFamily = fontFamily,
-                    fontWeight = if (playbackSettings.isSubtitleBold) FontWeight.Bold else FontWeight.Normal,
-                    fontSize = (14 * textScale.coerceIn(0.7f, 1.8f)).sp,
+                    fontWeight = fontWeight,
+                    fontSize = previewSize,
                     textAlign = TextAlign.Center
                 )
             }
@@ -774,9 +922,18 @@ private fun SyncTab(
     onSetSubtitleDelay: (Long) -> Unit,
     onUpdateSubtitleDelay: (Long) -> Unit,
     onUpdateSubtitleVerticalOffset: (Float) -> Unit,
+    onCommitSubtitleVerticalOffset: (Float) -> Unit,
     onUpdateSubtitleGesturesEnabled: (Boolean) -> Unit
 ) {
-    var localOffset by remember(playbackSettings.subtitleVerticalOffset) { mutableFloatStateOf(playbackSettings.subtitleVerticalOffset) }
+    var localOffset by remember { mutableFloatStateOf(playbackSettings.subtitleVerticalOffset) }
+    val offsetInteractionSource = remember { MutableInteractionSource() }
+    val isOffsetDragging by offsetInteractionSource.collectIsDraggedAsState()
+
+    LaunchedEffect(playbackSettings.subtitleVerticalOffset) {
+        if (!isOffsetDragging) {
+            localOffset = playbackSettings.subtitleVerticalOffset
+        }
+    }
 
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         // Subtitle Delay Card
@@ -952,10 +1109,11 @@ private fun SyncTab(
                         contentDescription = "Lower subtitles",
                         onStep = {
                             val newOffset = (localOffset - 0.05f)
-                                .coerceAtLeast(0f)
+                                .coerceAtLeast(-0.50f)
                                 .roundToTwoDecimals()
                             localOffset = newOffset
                             onUpdateSubtitleVerticalOffset(newOffset)
+                            onCommitSubtitleVerticalOffset(newOffset)
                         }
                     )
 
@@ -965,7 +1123,11 @@ private fun SyncTab(
                             localOffset = it
                             onUpdateSubtitleVerticalOffset(it.roundToTwoDecimals())
                         },
-                        valueRange = 0f..0.85f,
+                        onValueChangeFinished = {
+                            onCommitSubtitleVerticalOffset(localOffset.roundToTwoDecimals())
+                        },
+                        valueRange = -0.50f..0.85f,
+                        interactionSource = offsetInteractionSource,
                         modifier = Modifier.weight(1f)
                     )
 
@@ -978,6 +1140,7 @@ private fun SyncTab(
                                 .roundToTwoDecimals()
                             localOffset = newOffset
                             onUpdateSubtitleVerticalOffset(newOffset)
+                            onCommitSubtitleVerticalOffset(newOffset)
                         }
                     )
                 }

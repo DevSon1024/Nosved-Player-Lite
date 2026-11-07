@@ -89,6 +89,9 @@ data class PlaybackSettings(
     val subtitleDelayMs: Long = 0L,
     val subtitleVerticalOffset: Float = 0f,
     val subtitleGesturesEnabled: Boolean = true,
+    val subtitleBorderWidth: Float = 2.5f,
+    val subtitleBorderColor: Long = 0xFF000000L,
+    val subtitleTextColor: Long = 0xFFFFFFFFL,
     val tapAndHoldSpeed: Float = 2.0f,
     val doubleTapSeekDuration: Long = 10000L,
     val keepAwakeAlways: Boolean = false,
@@ -168,6 +171,9 @@ class PlaybackSettingsRepository(private val context: Context) {
         val SUBTITLE_DELAY_MS = androidx.datastore.preferences.core.longPreferencesKey("subtitle_delay_ms")
         val SUBTITLE_VERTICAL_OFFSET = floatPreferencesKey("subtitle_vertical_offset")
         val SUBTITLE_GESTURES_ENABLED = booleanPreferencesKey("subtitle_gestures_enabled")
+        val SUBTITLE_BORDER_WIDTH = floatPreferencesKey("subtitle_border_width")
+        val SUBTITLE_BORDER_COLOR = androidx.datastore.preferences.core.longPreferencesKey("subtitle_border_color")
+        val SUBTITLE_TEXT_COLOR = androidx.datastore.preferences.core.longPreferencesKey("subtitle_text_color")
         val TAP_AND_HOLD_SPEED = floatPreferencesKey("tap_and_hold_speed")
         val DOUBLE_TAP_SEEK_DURATION = androidx.datastore.preferences.core.longPreferencesKey("double_tap_seek_duration")
         val KEEP_AWAKE_ALWAYS = booleanPreferencesKey("keep_awake_always")
@@ -252,6 +258,9 @@ class PlaybackSettingsRepository(private val context: Context) {
                 subtitleDelayMs = preferences[PreferencesKeys.SUBTITLE_DELAY_MS] ?: 0L,
                 subtitleVerticalOffset = preferences[PreferencesKeys.SUBTITLE_VERTICAL_OFFSET] ?: 0f,
                 subtitleGesturesEnabled = preferences[PreferencesKeys.SUBTITLE_GESTURES_ENABLED] ?: true,
+                subtitleBorderWidth = preferences[PreferencesKeys.SUBTITLE_BORDER_WIDTH] ?: 2.5f,
+                subtitleBorderColor = preferences[PreferencesKeys.SUBTITLE_BORDER_COLOR] ?: 0xFF000000L,
+                subtitleTextColor = preferences[PreferencesKeys.SUBTITLE_TEXT_COLOR] ?: 0xFFFFFFFFL,
                 tapAndHoldSpeed = preferences[PreferencesKeys.TAP_AND_HOLD_SPEED] ?: 2.0f,
                 doubleTapSeekDuration = preferences[PreferencesKeys.DOUBLE_TAP_SEEK_DURATION] ?: 10000L,
                 keepAwakeAlways = preferences[PreferencesKeys.KEEP_AWAKE_ALWAYS] ?: false,
@@ -524,6 +533,9 @@ class PlaybackSettingsRepository(private val context: Context) {
     suspend fun updateSubtitleDelayMs(delayMs: Long) { context.dataStore.edit { it[PreferencesKeys.SUBTITLE_DELAY_MS] = delayMs } }
     suspend fun updateSubtitleVerticalOffset(offset: Float) { context.dataStore.edit { it[PreferencesKeys.SUBTITLE_VERTICAL_OFFSET] = offset } }
     suspend fun updateSubtitleGesturesEnabled(enabled: Boolean) { context.dataStore.edit { it[PreferencesKeys.SUBTITLE_GESTURES_ENABLED] = enabled } }
+    suspend fun updateSubtitleBorderWidth(width: Float) { context.dataStore.edit { it[PreferencesKeys.SUBTITLE_BORDER_WIDTH] = width } }
+    suspend fun updateSubtitleBorderColor(color: Long) { context.dataStore.edit { it[PreferencesKeys.SUBTITLE_BORDER_COLOR] = color } }
+    suspend fun updateSubtitleTextColor(color: Long) { context.dataStore.edit { it[PreferencesKeys.SUBTITLE_TEXT_COLOR] = color } }
     suspend fun updateTapAndHoldSpeed(speed: Float) { context.dataStore.edit { it[PreferencesKeys.TAP_AND_HOLD_SPEED] = speed } }
     suspend fun updateDoubleTapSeekDuration(durationMs: Long) { context.dataStore.edit { it[PreferencesKeys.DOUBLE_TAP_SEEK_DURATION] = durationMs } }
     suspend fun updateKeepAwakeAlways(enabled: Boolean) { context.dataStore.edit { it[PreferencesKeys.KEEP_AWAKE_ALWAYS] = enabled } }
