@@ -121,7 +121,8 @@ fun NavGraph(
                 onBack               = { safePopBackStack() },
                 // Type-safe navigation: SearchResultsRoute eliminates manual URL encoding
                 onNavigateToSearch   = { query -> navController.navigate(SearchResultsRoute(query = query)) },
-                viewModel            = videoListViewModel
+                viewModel            = videoListViewModel,
+                videoViewModel       = videoViewModel
             )
         }
 

@@ -102,6 +102,17 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     private val _currentVideo = MutableStateFlow<Video?>(null)
     val currentVideo: StateFlow<Video?> = _currentVideo.asStateFlow()
 
+    private val _lastClosedVideoUri = MutableStateFlow<String?>(null)
+    val lastClosedVideoUri: StateFlow<String?> = _lastClosedVideoUri.asStateFlow()
+
+    fun setLastClosedVideoUri(uri: String?) {
+        _lastClosedVideoUri.value = uri
+    }
+
+    fun clearLastClosedVideoUri() {
+        _lastClosedVideoUri.value = null
+    }
+
     private val _currentPlaylist = MutableStateFlow<List<Video>>(emptyList())
     val currentPlaylist: StateFlow<List<Video>> = _currentPlaylist.asStateFlow()
     
@@ -444,6 +455,9 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         val pos = resolvePositionToSave()
         if (uri != null && pos > 0L) {
             viewModelScope.launch { historyRepo.savePosition(uri, pos) }
+        }
+        if (uri != null) {
+            _lastClosedVideoUri.value = uri
         }
         playerManager?.exoPlayer?.stop()
         playerManager?.exoPlayer?.clearMediaItems()
