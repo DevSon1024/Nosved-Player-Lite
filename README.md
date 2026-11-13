@@ -78,7 +78,6 @@
 
 > > ### Powerful Subtitle Engine
 
-- **Embedded ASS/SSA Customization** - Full control over subtitle fonts, text size, bolding, and robust background corner boxes.
 - **Swipe-to-Seek Dialog** - Instantly jump backward or forward through dialogue lines by swiping directly on the subtitle text.
 - **Advanced Sync** - Manual speed sync and text encoding adjustments for perfect audio-visual timing.
 
